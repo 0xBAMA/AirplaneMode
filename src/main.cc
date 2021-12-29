@@ -43,9 +43,12 @@ constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max
 constexpr baseType  FIELD_OF_VIEW = 0.25;
 constexpr baseType  PALETTE_SCALAR = 16.18;
 constexpr baseType  BRIGHTNESS_SCALAR = 16.18;
-constexpr long long REPORT_DELAY = 16; 				// reporter thread sleep duration, in ms
-constexpr long long NUM_PRIMITIVES = 69;
+constexpr long long REPORT_DELAY = 32; 				// reporter thread sleep duration, in ms
+constexpr long long NUM_PRIMITIVES = 169;
 constexpr long long PROGRESS_INDICATOR_STOPS = 69; // cli spaces to take up
+
+
+
 
 // ray representation (origin+direction)
 struct ray {
@@ -93,12 +96,29 @@ vec3 random_in_unit_disk( std::shared_ptr< std::mt19937_64 > gen ) { // random i
 	return vec3( val.values[ 0 ], val.values[ 1 ], 0.0 );
 }
 
-// iq style palette
+
+
+// iq style palettes
+vec3 paletteA = vec3( 0.50, 0.50, 0.50 );
+vec3 paletteB = vec3( 0.50, 0.50, 0.50 );
+vec3 paletteC = vec3( 1.00, 1.00, 1.00 );
+vec3 paletteD = vec3( 0.00, 0.10, 0.20 );
+
+// vec3 paletteA = vec3( 0.50, 0.50, 0.50 );
+// vec3 paletteB = vec3( 0.50, 0.50, 0.50 );
+// vec3 paletteC = vec3( 1.00, 1.00, 0.50 );
+// vec3 paletteD = vec3( 0.80, 0.90, 0.30 );
+
+// vec3 paletteA = vec3( 0.50, 0.50, 0.50 );
+// vec3 paletteB = vec3( 0.50, 0.50, 0.50 );
+// vec3 paletteC = vec3( 1.00, 0.70, 0.40 );
+// vec3 paletteD = vec3( 0.00, 0.15, 0.20 );
+
 vec3 palette( baseType t,
-	vec3 a = vec3( 0.50, 0.50, 0.50 ),
-	vec3 b = vec3( 0.50, 0.50, 0.50 ),
-	vec3 c = vec3( 1.00, 1.00, 1.00 ),
-	vec3 d = vec3( 0.00, 0.33, 0.67 ) ) {
+	vec3 a = paletteA,
+	vec3 b = paletteB,
+	vec3 c = paletteC,
+	vec3 d = paletteD ) {
 	vec3 temp = ( c * t + d ) * 2.0 * pi;
 	return a + b * vec3( cos( temp.values[ 0 ] ), cos( temp.values[ 1 ] ), cos( temp.values[ 2 ] ) );
 }
@@ -335,8 +355,8 @@ public:
 		// contents.push_back( std::make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
 
-		for( int i = 0; i < 168; i++ ) {
-			contents.push_back( std::make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? rng( gen ) < 0.1618 ? 3 : 1 : 2 ) );
+		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
+			contents.push_back( std::make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
 			int select = int( floor( rng( gen ) * 3.0 ) );
 			vec3 v0 = randomVector( gen );
@@ -476,7 +496,7 @@ private:
 		in.values[ 0 ] = std::pow( std::clamp( in.values[ 0 ], 0.0, 1.0 ), 1.0 / IMAGE_GAMMA ); // gamma correct
 		in.values[ 1 ] = std::pow( std::clamp( in.values[ 1 ], 0.0, 1.0 ), 1.0 / IMAGE_GAMMA );
 		in.values[ 2 ] = std::pow( std::clamp( in.values[ 2 ], 0.0, 1.0 ), 1.0 / IMAGE_GAMMA );
-  }
+	}
 
 	vec3 pathtraceSample( const int x, const int y, const int id ){
 		// throughput's initial value of 1. in each channel indicates that it is initially
@@ -508,11 +528,15 @@ private:
 			// } else if ( h.materialID == 1 && !h.front ) {
 			// 	current += throughput * ( palette( h.primitiveID * PALETTE_SCALAR ) * BRIGHTNESS_SCALAR );
 			// } else if ( h.materialID == 2 ) {
+
+
+
 			if ( h.materialID == 2 ) {
 				r.direction = reflect( r.origin - old_ro, h.normal );
 				throughput *= vec3( 0.89 );
 			} else if ( h.materialID == 1 ) {
-				current += throughput * abs( h.normal );
+				// current += throughput * abs( h.normal );
+				current += throughput * palette( ( 2.2 / NUM_PRIMITIVES ) * h.primitiveID );
 			} else if ( h.materialID == 3 ) {
 				throughput *= vec3( 0.65 );
 			}
@@ -545,7 +569,7 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	for ( size_t i = 9; i <= 168; i++ ) {
+	for ( size_t i = 38; i <= 168; i++ ) {
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
 		renderer r;
 		r.renderAndSaveTo( s.str() );
