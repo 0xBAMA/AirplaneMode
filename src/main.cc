@@ -33,14 +33,14 @@ using vec3 = vector3< baseType >;
 // render parameters
 constexpr long long X_IMAGE_DIM = 1920;
 constexpr long long Y_IMAGE_DIM = 1080;
-constexpr long long TILESIZE_XY = 8;
-constexpr long long MAX_BOUNCES = 10;
-constexpr long long NUM_SAMPLES = 32;
+constexpr long long TILESIZE_XY = 16;
+constexpr long long MAX_BOUNCES = 20;
+constexpr long long NUM_SAMPLES = 128;
 constexpr long long NUM_THREADS = 5;
 constexpr baseType  IMAGE_GAMMA = 2.2;
 constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
 constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max() ) / 10.0;
-constexpr baseType  FIELD_OF_VIEW = 0.35;
+constexpr baseType  FIELD_OF_VIEW = 0.25;
 constexpr baseType  PALETTE_SCALAR = 16.18;
 constexpr baseType  BRIGHTNESS_SCALAR = 16.18;
 constexpr long long REPORT_DELAY = 16; 				// reporter thread sleep duration, in ms
@@ -335,27 +335,15 @@ public:
 		// contents.push_back( std::make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
 
-		for( int i = 0; i < 200; i++ ) {
-			float x = rng( gen ) - 0.5, y = rng( gen ) - 0.5, z = rng( gen ) - 0.5;
-			if ( abs( x ) < 0.25 && abs( y ) < 0.25 && abs( z ) < 0.25 )
-				contents.push_back( std::make_shared< sphere >( vec3( x, y, z ), 0.125 * rng( gen ), 2 ) );
+		for( int i = 0; i < 168; i++ ) {
+			contents.push_back( std::make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? rng( gen ) < 0.1618 ? 3 : 1 : 2 ) );
 
+			int select = int( floor( rng( gen ) * 3.0 ) );
+			vec3 v0 = randomVector( gen );
+			vec3 v1 = randomVector( gen );
 
-
-			int select = int( floor( rng(gen) * 3.0 ) );
-			vec3 v0 = randomVector( gen ) * 0.12577;
-			vec3 v1 = randomVector( gen ) * 0.12577;
-
-			vec3 base = vec3( 1.0 );
-			for( int j = 0; j < 3; j++ )
-				if( j != select )
-					base.values[ j ] *= 0.0;
-
-			vec3 base2 = base;
-			base.values[select] *= rng( gen ) ? 1.0 : -1.0;
-
-			contents.push_back( std::make_shared< aabb >( base + vec3( std::min( v0.values[ 0 ], v1.values[ 0 ] ), std::min( v0.values[ 1 ], v1.values[ 1 ] ), std::min( v0.values[ 2 ], v1.values[ 2 ] ) ),
-																											base2 + vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), 1 ) );
+			contents.push_back( std::make_shared< aabb >( vec3( std::min( v0.values[ 0 ], v1.values[ 0 ] ), std::min( v0.values[ 1 ], v1.values[ 1 ] ), std::min( v0.values[ 2 ], v1.values[ 2 ] ) ),
+																					vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), rng( gen ) < 0.5 ? 3 : 1 ) );
 		}
 
 	}
@@ -386,6 +374,10 @@ public:
 	void renderAndSaveTo( std::string filename ) {
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
+
+		s.clear();
+		s.populate();
+
 		c.lookat( randomUnitVector( gen[ 0 ] ) * ( 2.2 + rng( gen[ 0 ] ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
 		for ( int id = 0; id <= NUM_THREADS; id++ ){         // do work
@@ -474,7 +466,7 @@ private:
 
 	// todo - add switch handling, for some different tonemap curves
 	void tonemapAndGamma( vec3& in ){
-		in *= 0.6f; // function to tonemap color value in place
+		// in *= 0.6f; // function to tonemap color value in place
 		baseType a = 2.51;
 		baseType b = 0.03;
 		baseType c = 2.43;
@@ -521,6 +513,8 @@ private:
 				throughput *= vec3( 0.89 );
 			} else if ( h.materialID == 1 ) {
 				current += throughput * abs( h.normal );
+			} else if ( h.materialID == 3 ) {
+				throughput *= vec3( 0.65 );
 			}
 
 
@@ -551,7 +545,7 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	for ( size_t i = 0; i <= 3; i++ ) {
+	for ( size_t i = 9; i <= 168; i++ ) {
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
 		renderer r;
 		r.renderAndSaveTo( s.str() );
