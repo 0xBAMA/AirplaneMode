@@ -61,13 +61,13 @@ template < class T >
 T dot( vector2< T > v1, vector2< T > v2 ) { return v1.values[ 0 ] * v2.values[ 0 ] + v1.values[ 1 ] * v2.values[ 1 ]; }
 
 template < class T > // squared length
-T len2( vector2< T > v ) { return dot( v, v ); }
+T lengthSquared( vector2< T > v ) { return dot( v, v ); }
 
 template < class T > // vector length
-T len( vector2< T > v ) { return sqrt( len2( v ) ); }
+T length( vector2< T > v ) { return sqrt( lengthSquared( v ) ); }
 
 template < class T > // return unit length colinear vector
-vector2< T > normalize( vector2< T > in ) { T length = len( in ); return in / length; }
+vector2< T > normalize( vector2< T > in ) { T len = length( in ); return in / len; }
 
 template < class T > // absolute value of all vector elements
 vector2< T > abs( vector2< T > v ) { return vector2< T >( abs( v.values[ 0 ] ), abs( v.values[ 1 ] ) ); }
@@ -136,13 +136,13 @@ template < class T >
 const T dot( vector3< T > v1, vector3< T > v2 ) { return v1.values[ 0 ] * v2.values[ 0 ] + v1.values[ 1 ] * v2.values[ 1 ] + v1.values[ 2 ] * v2.values[ 2 ]; }
 
 template < class T > // squared length
-const T len2( vector3< T > v ) { return dot( v, v ); }
+const T lengthSquared( vector3< T > v ) { return dot( v, v ); }
 
 template < class T > // vector length
-const T len( vector3< T > v ) { return sqrt( len2( v ) ); }
+const T length( vector3< T > v ) { return sqrt( lengthSquared( v ) ); }
 
 template < class T > // return unit length colinear vector
-const vector3< T > normalize( vector3< T > in ) { T length = len( in ); return in / length; }
+const vector3< T > normalize( vector3< T > in ) { T len = length( in ); return in / len; }
 
 template < class T > // elementwise absolute value
 vector3< T > abs( vector3< T > v ) { return vector3< T >( abs( v.values[ 0 ] ), abs( v.values[ 1 ] ), abs( v.values[ 2 ] ) ); }

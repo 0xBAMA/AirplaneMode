@@ -1,18 +1,19 @@
-#include <chrono>          // timing utilities
-#include <iostream>       // text i/o
-#include <iomanip>
-#include <stdio.h>      // printf if needed
-#include <vector>      // std::vector
-#include <random>     // prng
-#include <string>    // std::string
-#include <sstream>    // std::stringstream
-#include <algorithm> // clamp
-#include <atomic>   // atomic_llong
-#include <thread>  // threads
-#include <memory> // shared_ptr
+#include <chrono>				// timing utilities
+#include <iostream>			// text i/o
+#include <iomanip>			// cout formatting
+#include <stdio.h>			// printf if needed
+#include <vector>				// std::vector
+#include <random>				// prng
+#include <string>				// std::string
+#include <sstream>			// std::stringstream
+#include <algorithm>		// clamp
+#include <atomic>				// atomic_llong
+#include <thread>				// threads
+#include <memory>				// shared_ptr
 
 using std::cerr, std::cin, std::cout, std::endl, std::flush;
 using std::chrono::high_resolution_clock, std::chrono::duration_cast, std::chrono::milliseconds;
+using std::make_shared;
 
 // my vector library
 #include "lib/vector.h"
@@ -31,20 +32,20 @@ using vec2 = vector2< baseType >;
 using vec3 = vector3< baseType >;
 
 // render parameters
-constexpr long long X_IMAGE_DIM = 1920;
-constexpr long long Y_IMAGE_DIM = 1080;
+constexpr long long X_IMAGE_DIM = 1920/3;
+constexpr long long Y_IMAGE_DIM = 1080/3;
 constexpr long long TILESIZE_XY = 16;
 constexpr long long MAX_BOUNCES = 20;
-constexpr long long NUM_SAMPLES = 128;
+constexpr long long NUM_SAMPLES = 64;
 constexpr long long NUM_THREADS = 5;
 constexpr baseType  IMAGE_GAMMA = 2.2;
 constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
 constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max() ) / 10.0;
-constexpr baseType  FIELD_OF_VIEW = 0.25;
+constexpr baseType  FIELD_OF_VIEW = 0.65;
 constexpr baseType  PALETTE_SCALAR = 16.18;
 constexpr baseType  BRIGHTNESS_SCALAR = 16.18;
 constexpr long long REPORT_DELAY = 32; 				// reporter thread sleep duration, in ms
-constexpr long long NUM_PRIMITIVES = 169;
+constexpr long long NUM_PRIMITIVES = 69;
 constexpr long long PROGRESS_INDICATOR_STOPS = 69; // cli spaces to take up
 
 
@@ -196,7 +197,13 @@ private:  // geometry parameters
 // axis aligned bounding box
 class aabb : public primitive {
 public:
-	aabb( vec3 mins, vec3 maxs, int m ) : bounds{ mins, maxs } { materialID = m; }
+	aabb( vec3 mins, vec3 maxs, int m ) : bounds{ mins, maxs } {
+		materialID = m;
+		vec3 tempMins = vec3( std::min( bounds[ 0 ].values[ 0 ], bounds[ 1 ].values[ 0 ] ), std::min( bounds[ 0 ].values[ 1 ], bounds[ 1 ].values[ 1 ] ), std::min( bounds[ 0 ].values[ 2 ], bounds[ 1 ].values[ 2 ] ) );
+		vec3 tempMaxs = vec3( std::max( bounds[ 0 ].values[ 0 ], bounds[ 1 ].values[ 0 ] ), std::max( bounds[ 0 ].values[ 1 ], bounds[ 1 ].values[ 1 ] ), std::max( bounds[ 0 ].values[ 2 ], bounds[ 1 ].values[ 2 ] ) );
+		bounds[ 0 ] = tempMins;
+		bounds[ 1 ] = tempMaxs;
+  }
 
 	//	Alexander Majercik, Cyril Crassin, Peter Shirley, Morgan McGuire
 	//	A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering
@@ -335,36 +342,91 @@ class scene{ // scene as primitive list + material list container
 public:
 	scene() { }
 	void clear() { contents.clear(); }
+
+	void recursiveSplit( vec3 min, vec3 max /*, int previousAxisPick */ ) {
+		if( length( min - max ) < 0.1 ||
+				abs( max.values[ 0 ] - min.values[ 0 ] ) < 0.01 ||
+				abs( max.values[ 1 ] - min.values[ 1 ] ) < 0.01 ||
+				abs( max.values[ 2 ] - min.values[ 2 ] ) < 0.01 )
+			return;
+
+
+		if( rng( gen ) < 0.1 ) {
+			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), rng( gen ) < 0.3 ? 3 : 1 ) ); // shrink slightly, to create gaps
+		} else {
+			// pick an axis
+
+			int axisPick;
+			while( previousAxisPick == ( axisPick = int( floor( rng( gen ) * 3.0 ) ) ) );
+			// cout << "picked axis " << axisPick << endl << std::flush;
+
+			// get a value 0-1 to split by
+			baseType axisSplit = ( rng( gen ) * 0.75 ) + 0.15;
+			baseType midpointLoc = ( max.values[ axisPick ] - min.values[ axisPick ] ) * axisSplit + min.values[ axisPick ];
+
+			// cout << "input mins: " << min.values[ 0 ] << " " << min.values[ 1 ] << " " << min.values[ 2 ] << std::endl << std::flush;
+			// cout << "input maxs: " << max.values[ 0 ] << " " << max.values[ 1 ] << " " << max.values[ 2 ] << std::endl << std::flush;
+
+
+			// generate the aabb dimensions for the two split boxes
+			vec3 minMiddle = min;
+			minMiddle.values[ axisPick ] = midpointLoc;
+			// cout << "computed minMiddle: " << minMiddle.values[ 0 ] << " " << minMiddle.values[ 1 ] << " " << minMiddle.values[ 2 ] << std::endl << std::flush;
+
+			vec3 maxMiddle = max;
+			maxMiddle.values[ axisPick ] = midpointLoc;
+			// cout << "computed maxMiddle: " << maxMiddle.values[ 0 ] << " " << maxMiddle.values[ 1 ] << " " << maxMiddle.values[ 2 ] << std::endl << std::flush;
+			// cout << endl << endl;
+
+
+			// recurse, branch in 2 split on that axis
+			recursiveSplit( min, maxMiddle /* , axisPick */ );
+			recursiveSplit( minMiddle, max /* , axisPick */ );
+		}
+	}
+
 	void populate(){
 		std::random_device r;
 		std::seed_seq s{ r(), r(), r(), r(), r(), r(), r(), r(), r() };
-		auto gen = std::make_shared< std::mt19937_64 >( s );
+		gen = make_shared< std::mt19937_64 >( s );
 		// for (int i = 0; i < 7; i++)
-			// contents.push_back(std::make_shared<sphere>(0.8*randomVector(gen), 0.03*rng(gen), 0));
+			// contents.push_back(make_shared<sphere>(0.8*randomVector(gen), 0.03*rng(gen), 0));
 		// for ( int i = 0; i < NUM_PRIMITIVES; i++ ){
 		//   baseType yval = ( ( baseType( i ) / NUM_PRIMITIVES ) - 0.5 ) * 2.0;
 		//   vec3 p1 = vec3( std::cos( yval * 6.5 ), std::sin( yval * 14.0 ), yval * pi );
 		//   vec3 p2 = vec3( std::cos( yval * 9.7 ) + 0.1, std::sin( yval * 16.4 ) + 0.7, yval);
 		//   vec3 p3 = vec3( std::cos( yval * 15.8 ) - 0.3, std::sin( yval * 19.2 ) + 0.1, yval + 0.3 * rng( gen ) ) + randomVector( gen ) * 0.04;
-		//   contents.push_back( std::make_shared< triangle >( p1, p2, rng( gen ) < 0.1 ? randomVector( gen ) : p3, rng( gen ) < 0.1 ? 1 : 3 ) );
-		//   contents.push_back( std::make_shared< sphere >( randomVector( gen ), 0.4 * rng( gen ), rng( gen ) < 0.4 ? 0 : 2 ) );
+		//   contents.push_back( make_shared< triangle >( p1, p2, rng( gen ) < 0.1 ? randomVector( gen ) : p3, rng( gen ) < 0.1 ? 1 : 3 ) );
+		//   contents.push_back( make_shared< sphere >( randomVector( gen ), 0.4 * rng( gen ), rng( gen ) < 0.4 ? 0 : 2 ) );
 		// }
 		//
-		// contents.push_back( std::make_shared< sphere >( vec3( 1.5, 0.0, 0.0 ), 0.10, 2 ) );
-		// contents.push_back( std::make_shared< sphere >( vec3( 0.0, 1.5, 0.0 ), 0.15, 2 ) );
-		// contents.push_back( std::make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
+		// contents.push_back( make_shared< sphere >( vec3( 1.5, 0.0, 0.0 ), 0.10, 2 ) );
+		// contents.push_back( make_shared< sphere >( vec3( 0.0, 1.5, 0.0 ), 0.15, 2 ) );
+		// contents.push_back( make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
+
+
+
+
+
 
 
 		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
-			contents.push_back( std::make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
-			int select = int( floor( rng( gen ) * 3.0 ) );
-			vec3 v0 = randomVector( gen );
-			vec3 v1 = randomVector( gen );
+			// int select = int( floor( rng( gen ) * 3.0 ) );
+			// vec3 v0 = randomVector( gen );
+			// vec3 v1 = randomVector( gen );
 
-			contents.push_back( std::make_shared< aabb >( vec3( std::min( v0.values[ 0 ], v1.values[ 0 ] ), std::min( v0.values[ 1 ], v1.values[ 1 ] ), std::min( v0.values[ 2 ], v1.values[ 2 ] ) ),
-																					vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), rng( gen ) < 0.5 ? 3 : 1 ) );
+			// contents.push_back( make_shared< aabb >( vec3( std::min( v0.values[ 0 ], v1.values[ 0 ] ), std::min( v0.values[ 1 ], v1.values[ 1 ] ), std::min( v0.values[ 2 ], v1.values[ 2 ] ) ),
+																					// vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), rng( gen ) < 0.5 ? 3 : 1 ) );
 		}
+
+
+
+
+
+		// recursiveSplit( vec3( -1.0 ), vec3( 1.0 ), 0 );
+		recursiveSplit( vec3( -1.0 ), vec3( 1.0 ) );
 
 	}
 	hitrecord rayQuery( ray r ) const {
@@ -381,6 +443,8 @@ public:
 	}
 	std::vector< std::shared_ptr< primitive > > contents; // list of primitives making up the scene
 	// std::vector<std::shared_ptr<material>> materials; // list of materials present in the scene
+
+	std::shared_ptr< std::mt19937_64 > gen;
 };
 
 
@@ -480,7 +544,7 @@ private:
 		std::random_device r;
 		for ( int i = 0; i < NUM_THREADS; i++ ) {
 			std::seed_seq s{ r(), r(), r(), r(), r(), r(), r(), r(), r() };
-			gen.push_back( std::make_shared< std::mt19937_64 >( s ) );
+			gen.push_back( make_shared< std::mt19937_64 >( s ) );
 		}
 	}
 
@@ -569,7 +633,7 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	for ( size_t i = 38; i <= 168; i++ ) {
+	for ( size_t i = 41; i <= 168; i++ ) {
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
 		renderer r;
 		r.renderAndSaveTo( s.str() );
