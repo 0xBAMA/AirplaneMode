@@ -31,16 +31,16 @@ using vec2 = vector2< baseType >;
 using vec3 = vector3< baseType >;
 
 // render parameters
-constexpr long long X_IMAGE_DIM = 1920 / 4;
-constexpr long long Y_IMAGE_DIM = 1080 / 4;
+constexpr long long X_IMAGE_DIM = 1920;
+constexpr long long Y_IMAGE_DIM = 1080;
 constexpr long long TILESIZE_XY = 8;
-constexpr long long MAX_BOUNCES = 25;
-constexpr long long NUM_SAMPLES = 16;
-constexpr long long NUM_THREADS = 4;
+constexpr long long MAX_BOUNCES = 10;
+constexpr long long NUM_SAMPLES = 32;
+constexpr long long NUM_THREADS = 5;
 constexpr baseType  IMAGE_GAMMA = 2.2;
 constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
 constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max() ) / 10.0;
-constexpr baseType  FIELD_OF_VIEW = 0.69420;
+constexpr baseType  FIELD_OF_VIEW = 0.35;
 constexpr baseType  PALETTE_SCALAR = 16.18;
 constexpr baseType  BRIGHTNESS_SCALAR = 16.18;
 constexpr long long REPORT_DELAY = 16; 				// reporter thread sleep duration, in ms
@@ -197,58 +197,77 @@ public:
 	hitrecord intersect ( ray r ) const override {
 		hitrecord hit; // initially at max distance
 
-		int sign[ 3 ];
-		vec3 inverseDirection = vec3( 1.0 ) / r.direction;
-		sign[ 0 ] = inverseDirection.values[ 0 ] < 0.0 ? 1 : 0;
-		sign[ 1 ] = inverseDirection.values[ 1 ] < 0.0 ? 1 : 0;
-		sign[ 2 ] = inverseDirection.values[ 2 ] < 0.0 ? 1 : 0;
-
-		int hitPair = -1;
+		baseType t0 = 0.0, t1 = DMAX_TRAVEL;
 		baseType tmin, tmax, tymin, tymax, tzmin, tzmax;
-
-		tmin = ( bounds[     sign[ 0 ] ].values[ 0 ] - r.origin.values[ 0 ] ) * inverseDirection.values[ 0 ];
-		tmax = ( bounds[ 1 - sign[ 0 ] ].values[ 0 ] - r.origin.values[ 0 ] ) * inverseDirection.values[ 0 ];
-
-		if ( tmin < DMAX_TRAVEL || tmax > 0.0 ) hitPair = 0;
-
-		tymin = (bounds[     sign[ 1 ] ].values[ 1 ] - r.origin.values[ 1 ] ) * inverseDirection.values[ 1 ];
-		tymax = (bounds[ 1 - sign[ 1 ] ].values[ 1 ] - r.origin.values[ 1 ] ) * inverseDirection.values[ 1 ];
-
-		if ( tmin > tymax || tymin > tmax ) {
-			hitPair = -1;
+		if (r.direction.x() >= 0) {
+			tmin = (bounds[0].x() - r.origin.x()) / r.direction.x();
+			tmax = (bounds[1].x() - r.origin.x()) / r.direction.x();
+		}	else {
+			tmin = (bounds[1].x() - r.origin.x()) / r.direction.x();
+			tmax = (bounds[0].x() - r.origin.x()) / r.direction.x();
+		}
+		if (r.direction.y() >= 0) {
+			tymin = (bounds[0].y() - r.origin.y()) / r.direction.y();
+			tymax = (bounds[1].y() - r.origin.y()) / r.direction.y();
+		}
+		else {
+			tymin = (bounds[1].y() - r.origin.y()) / r.direction.y();
+			tymax = (bounds[0].y() - r.origin.y()) / r.direction.y();
+		}
+		if ( (tmin > tymax) || (tymin > tmax) ){
+			tmin = DMAX_TRAVEL;
 			goto end;
 		}
-		if ( tymin > tmin ) tmin = tymin, hitPair = 1;
-		if ( tymax < tmax ) tmax = tymax, hitPair = 1;
-		if ( tmin < DMAX_TRAVEL || tmax > 0.0 ) goto end;
-
-		tzmin = ( bounds[     sign[ 2 ] ].values[ 2 ] - r.origin.values[ 2 ] ) * inverseDirection.values[ 2 ];
-		tzmax = ( bounds[ 1 - sign[ 2 ] ].values[ 2 ] - r.origin.values[ 2 ] ) * inverseDirection.values[ 2 ];
-
-		if ( tmin > tzmax || tzmin > tmax ) {
-			hitPair = -1;
+		if (tymin > tmin)
+			tmin = tymin;
+		if (tymax < tmax)
+			tmax = tymax;
+		if (r.direction.z() >= 0) {
+			tzmin = (bounds[0].z() - r.origin.z()) / r.direction.z();
+			tzmax = (bounds[1].z() - r.origin.z()) / r.direction.z();
+		} else {
+			tzmin = (bounds[1].z() - r.origin.z()) / r.direction.z();
+			tzmax = (bounds[0].z() - r.origin.z()) / r.direction.z();
+		}
+		if ( (tmin > tzmax) || (tzmin > tmax) ){
+			tmin = DMAX_TRAVEL;
 			goto end;
 		}
-		if ( tzmin > tmin ) tmin = tzmin, hitPair = 2;
-		if ( tzmax < tmax ) tmax = tzmax, hitPair = 2;
+		if (tzmin > tmin)
+			tmin = tzmin;
+		if (tzmax < tmax)
+			tmax = tzmax;
+		if ( (tmin > t1) || (tmax < t0) ) {
+			tmin = DMAX_TRAVEL;
+			goto end;
+		}
 
-
-
-		// if ( tmin < DMAX_TRAVEL && tmax > 0.0 ) {
-		// 	hitPair = -1;
-		// 	goto end;
-		// }
 
 	end:
-		hit.dtransit = hitPair == -1 ? DMAX_TRAVEL : tmin;
+		hit.dtransit = std::min( DMAX_TRAVEL, tmin );
 		hit.position = r.origin + hit.dtransit * r.direction;
 
-
 		// WIP - selection based on hit face
-		hit.normal = vec3( 0.0 );
-		if ( hitPair != -1 )
-			hit.normal.values[ hitPair ] = 1.0;
-
+		baseType dMX = abs( bounds[ 0 ].values[ 0 ] - hit.position.values[ 0 ] );
+		baseType dPX = abs( bounds[ 1 ].values[ 0 ] - hit.position.values[ 0 ] );
+		baseType dMY = abs( bounds[ 0 ].values[ 1 ] - hit.position.values[ 1 ] );
+		baseType dPY = abs( bounds[ 1 ].values[ 1 ] - hit.position.values[ 1 ] );
+		baseType dMZ = abs( bounds[ 0 ].values[ 2 ] - hit.position.values[ 2 ] );
+		baseType dPZ = abs( bounds[ 1 ].values[ 2 ] - hit.position.values[ 2 ] );
+		baseType dmin = std::min( std::min( dMX, dPX ), std::min( std::min( dMY, dPY ), std::min( dMZ, dPZ ) ) );
+		if ( dmin == dMX ) {
+			hit.normal = vec3( -1.0,  0.0,  0.0 );
+		} else if ( dmin == dPX ) {
+			hit.normal = vec3(  1.0,  0.0,  0.0 );
+		} else if ( dmin == dMY ) {
+			hit.normal = vec3(  0.0, -1.0,  0.0 );
+		} else if ( dmin == dPY ) {
+			hit.normal = vec3(  0.0,  1.0,  0.0 );
+		} else if ( dmin == dMZ ) {
+			hit.normal = vec3(  0.0,  0.0, -1.0 );
+		} else if ( dmin == dPZ ) {
+			hit.normal = vec3(  0.0,  0.0,  1.0 );
+		}
 
 		hit.materialID = materialID;
 		hit.front = dot( hit.normal, r.direction ) < 0.0 ? true : false;
@@ -310,11 +329,35 @@ public:
 		//   contents.push_back( std::make_shared< triangle >( p1, p2, rng( gen ) < 0.1 ? randomVector( gen ) : p3, rng( gen ) < 0.1 ? 1 : 3 ) );
 		//   contents.push_back( std::make_shared< sphere >( randomVector( gen ), 0.4 * rng( gen ), rng( gen ) < 0.4 ? 0 : 2 ) );
 		// }
+		//
+		// contents.push_back( std::make_shared< sphere >( vec3( 1.5, 0.0, 0.0 ), 0.10, 2 ) );
+		// contents.push_back( std::make_shared< sphere >( vec3( 0.0, 1.5, 0.0 ), 0.15, 2 ) );
+		// contents.push_back( std::make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
-		contents.push_back( std::make_shared< sphere >( vec3( 1.5, 0.0, 0.0 ), 0.10, 2 ) );
-		contents.push_back( std::make_shared< sphere >( vec3( 0.0, 1.5, 0.0 ), 0.15, 2 ) );
-		contents.push_back( std::make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
-		contents.push_back( std::make_shared< aabb >( vec3( -1.0 ), vec3( 1.0 ), 2 ) );
+
+		for( int i = 0; i < 200; i++ ) {
+			float x = rng( gen ) - 0.5, y = rng( gen ) - 0.5, z = rng( gen ) - 0.5;
+			if ( abs( x ) < 0.25 && abs( y ) < 0.25 && abs( z ) < 0.25 )
+				contents.push_back( std::make_shared< sphere >( vec3( x, y, z ), 0.125 * rng( gen ), 2 ) );
+
+
+
+			int select = int( floor( rng(gen) * 3.0 ) );
+			vec3 v0 = randomVector( gen ) * 0.12577;
+			vec3 v1 = randomVector( gen ) * 0.12577;
+
+			vec3 base = vec3( 1.0 );
+			for( int j = 0; j < 3; j++ )
+				if( j != select )
+					base.values[ j ] *= 0.0;
+
+			vec3 base2 = base;
+			base.values[select] *= rng( gen ) ? 1.0 : -1.0;
+
+			contents.push_back( std::make_shared< aabb >( base + vec3( std::min( v0.values[ 0 ], v1.values[ 0 ] ), std::min( v0.values[ 1 ], v1.values[ 1 ] ), std::min( v0.values[ 2 ], v1.values[ 2 ] ) ),
+																											base2 + vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), 1 ) );
+		}
+
 	}
 	hitrecord rayQuery( ray r ) const {
 		hitrecord h; // iterate through primitives and check for nearest intersection
@@ -476,7 +519,11 @@ private:
 			if ( h.materialID == 2 ) {
 				r.direction = reflect( r.origin - old_ro, h.normal );
 				throughput *= vec3( 0.89 );
+			} else if ( h.materialID == 1 ) {
+				current += throughput * abs( h.normal );
 			}
+
+
 			// } else if ( h.materialID == 3 ) {
 			// 	throughput *= vec3( 0.999 );
 			// } else if ( h.dtransit == DMAX_TRAVEL ) {
@@ -484,7 +531,6 @@ private:
 			// 	break; // escape
 			// }
 
-			current += throughput * abs( h.normal );
 
 			baseType p = std::max( throughput.values[ 0 ], std::max( throughput.values[ 1 ], throughput.values[ 2 ] ) );
 			if ( rng( gen[ id ] ) > p ) break;	// russian roulette termination check
@@ -505,7 +551,7 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	for ( size_t i = 0; i <= 5; i++ ) {
+	for ( size_t i = 0; i <= 3; i++ ) {
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
 		renderer r;
 		r.renderAndSaveTo( s.str() );
