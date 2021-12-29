@@ -12,33 +12,37 @@ constexpr double pi = 3.1415926535897932384626433832795;
 template < class T >
 class vector2 {
 public:
-  T values [ 2 ];
+	T values [ 2 ];
 
-  vector2 ()           { values[ 0 ] = T( 0 ); values[ 1 ] = T( 0 ); }
-  vector2 ( T val )    { values[ 0 ] = val;    values[ 1 ] = val;    }
-  vector2 ( T x, T y ) { values[ 0 ] = x;      values[ 1 ] = y;      }
+	vector2 ()						{ values[ 0 ] = T( 0 );	values[ 1 ] = T( 0 );	}
+	vector2 ( T val )			{ values[ 0 ] = val;		values[ 1 ] = val;		}
+	vector2 ( T x, T y )	{ values[ 0 ] = x;			values[ 1 ] = y;			}
 
-  //  +,- operators
-  const vector2< T > operator+( const vector2< T >& other ) const { return vector2( this->values[ 0 ] + other.values[ 0 ], this->values[ 1 ] + other.values[ 1 ]); }
-  const vector2< T >& operator+=( const vector2< T >& other ) { this->values[ 0 ] += other.values[ 0 ], this->values[ 1 ] += other.values[ 1 ]; }
+	// wip - I don't like the semantics of this
+	const T x() const { return values[ 0 ]; }
+	const T y() const { return values[ 1 ]; }
 
-  const vector2< T > operator-( const vector2< T >& other ) const { return vector2( this->values[ 0 ] - other.values[ 0 ], this->values[ 1 ] - other.values[ 1 ]); }
-  const vector2< T >& operator-=( const vector2< T >& other ) { this->values[ 0 ] -= other.values[ 0 ], this->values[ 1 ] -= other.values[ 1 ]; }
+	//  +,- operators
+	const vector2< T > operator+( const vector2< T >& other ) const { return vector2( this->values[ 0 ] + other.values[ 0 ], this->values[ 1 ] + other.values[ 1 ]); }
+	const vector2< T >& operator+=( const vector2< T >& other ) { this->values[ 0 ] += other.values[ 0 ], this->values[ 1 ] += other.values[ 1 ]; }
 
-  //  multiplication/division by a scalar of the same type - scale each element
-  const vector2< T > operator*( const T&  scalar ) const { return vector2( this->values[ 0 ] * scalar, this->values[ 1 ] * scalar ); }
-  const vector2< T >& operator*=( const T&  scalar ) { this->values[ 0 ] *= scalar, this->values[ 1 ] *= scalar; return *this; }
+	const vector2< T > operator-( const vector2< T >& other ) const { return vector2( this->values[ 0 ] - other.values[ 0 ], this->values[ 1 ] - other.values[ 1 ]); }
+	const vector2< T >& operator-=( const vector2< T >& other ) { this->values[ 0 ] -= other.values[ 0 ], this->values[ 1 ] -= other.values[ 1 ]; }
 
-  const vector2< T > operator/( const T&  scalar ) const { return vector2( this->values[ 0 ] / scalar, this->values[ 1 ] / scalar ); }
-  const vector2< T >& operator/=( const T&  scalar ) { this->values[ 0 ] /= scalar, this->values[ 1 ] /= scalar; return *this; }
+	//  multiplication/division by a scalar of the same type - scale each element
+	const vector2< T > operator*( const T&  scalar ) const { return vector2( this->values[ 0 ] * scalar, this->values[ 1 ] * scalar ); }
+	const vector2< T >& operator*=( const T&  scalar ) { this->values[ 0 ] *= scalar, this->values[ 1 ] *= scalar; return *this; }
 
-  //  multiplication by a vector of the same type - elementwise multiply (hadamard product)
-  const vector2< T > operator*( const vector2< T >& other ) const { return vector2( this->values[ 0 ] * other.values[ 0 ], this->values[ 1 ] * other.values[ 1 ] ); }
-  const vector2< T >& operator*=( const vector2< T >& other ) { this->values[ 0 ] *= other.values[ 0 ], this->values[ 1 ] *= other.values[ 1 ]; return *this; }
+	const vector2< T > operator/( const T&  scalar ) const { return vector2( this->values[ 0 ] / scalar, this->values[ 1 ] / scalar ); }
+	const vector2< T >& operator/=( const T&  scalar ) { this->values[ 0 ] /= scalar, this->values[ 1 ] /= scalar; return *this; }
 
-  //  division by a vector of the same type - elementwise divide
-  const vector2< T > operator/( const vector2< T >& other ) const { return vector2( this->values[ 0 ] / other.values[ 0 ], this->values[ 1 ] / other.values[ 1 ] ); }
-  const vector2< T >& operator/=( const vector2< T >& other ) { this->values[ 0 ] /= other.values[ 0 ], this->values[ 1 ] /= other.values[ 1 ]; return *this; }
+	//  multiplication by a vector of the same type - elementwise multiply (hadamard product)
+	const vector2< T > operator*( const vector2< T >& other ) const { return vector2( this->values[ 0 ] * other.values[ 0 ], this->values[ 1 ] * other.values[ 1 ] ); }
+	const vector2< T >& operator*=( const vector2< T >& other ) { this->values[ 0 ] *= other.values[ 0 ], this->values[ 1 ] *= other.values[ 1 ]; return *this; }
+
+	//  division by a vector of the same type - elementwise divide
+	const vector2< T > operator/( const vector2< T >& other ) const { return vector2( this->values[ 0 ] / other.values[ 0 ], this->values[ 1 ] / other.values[ 1 ] ); }
+	const vector2< T >& operator/=( const vector2< T >& other ) { this->values[ 0 ] /= other.values[ 0 ], this->values[ 1 ] /= other.values[ 1 ]; return *this; }
 };
 
 // addition/subtraction in the other order
@@ -65,11 +69,14 @@ T len( vector2< T > v ) { return sqrt( len2( v ) ); }
 template < class T > // return unit length colinear vector
 vector2< T > normalize( vector2< T > in ) { T length = len( in ); return in / length; }
 
+template < class T > // absolute value of all vector elements
+vector2< T > abs( vector2< T > v ) { return vector2< T >( abs( v.values[ 0 ] ), abs( v.values[ 1 ] ) ); }
+
 // rotate the 2d vector, by specified number degrees
 template < class T >
 vector2< T > rotate2D( vector2< T > in, double amt ) {
-  double radians = ( pi / 180. ) * amt;
-  return vector2< T >( in.values[ 0 ] * std::cos( radians ) - in.values[ 1 ] * std::sin( radians ), in.values[ 0 ] * std::sin( radians ) + in.values[ 1 ] * std::cos( radians ) );
+	double radians = ( pi / 180.0 ) * amt;
+	return vector2< T >( in.values[ 0 ] * std::cos( radians ) - in.values[ 1 ] * std::sin( radians ), in.values[ 0 ] * std::sin( radians ) + in.values[ 1 ] * std::cos( radians ) );
 }
 
 // --------
@@ -79,33 +86,38 @@ vector2< T > rotate2D( vector2< T > in, double amt ) {
 template < class T >
 class vector3 {
 public:
-  T values [ 3 ];
+	T values [ 3 ];
 
-  vector3 ()                { values[ 0 ]= T( 0 ); values[ 1 ] = T( 0 );  values[ 2 ]= T( 0 ); }
-  vector3 ( T val )         { values[ 0 ]= val;    values[ 1 ] = val;     values[ 2 ]= val;    }
-  vector3 ( T x, T y, T z ) { values[ 0 ]= x;      values[ 1 ] = y;       values[ 2 ]= z;      }
+	vector3 ()								{ values[ 0 ]= T( 0 );	values[ 1 ] = T( 0 );	values[ 2 ]= T( 0 );	}
+	vector3 ( T val )					{ values[ 0 ]= val;			values[ 1 ] = val;		values[ 2 ]= val;			}
+	vector3 ( T x, T y, T z )	{ values[ 0 ]= x;				values[ 1 ] = y;			values[ 2 ]= z;				}
 
-  //  +,- operators
-  const vector3< T > operator+( const vector3< T >& other ) const { return vector3( this->values[ 0 ] + other.values[ 0 ], this->values[ 1 ] + other.values[ 1 ], this->values[ 2 ] + other.values[ 2 ] ); }
-  const vector3< T >& operator+=( const vector3< T >& other ) { this->values[ 0 ] += other.values[ 0 ], this->values[ 1 ] += other.values[ 1 ], this->values[ 2 ] += other.values[ 2 ]; return *this; }
+	// wip - I don't like the semantics of this
+	const T x() const { return values[ 0 ]; }
+	const T y() const { return values[ 1 ]; }
+	const T z() const { return values[ 2 ]; }
 
-  const vector3< T > operator-( const vector3< T >& other ) const { return vector3( this->values[ 0 ] - other.values[ 0 ], this->values[ 1 ] - other.values[ 1 ], this->values[ 2 ] - other.values[ 2 ]); }
-  const vector3< T >& operator-=( const vector3< T >& other ) { this->values[ 0 ] -= other.values[ 0 ], this->values[ 1 ] -= other.values[ 1 ], this->values[ 2 ] -= other.values[ 2 ]; return *this; }
+	//  +,- operators
+	const vector3< T > operator+( const vector3< T >& other ) const { return vector3( this->values[ 0 ] + other.values[ 0 ], this->values[ 1 ] + other.values[ 1 ], this->values[ 2 ] + other.values[ 2 ] ); }
+	const vector3< T >& operator+=( const vector3< T >& other ) { this->values[ 0 ] += other.values[ 0 ], this->values[ 1 ] += other.values[ 1 ], this->values[ 2 ] += other.values[ 2 ]; return *this; }
 
-  //  multiplication/division by a scalar of the same type - scale each element
-  const vector3< T > operator*( const T& scalar ) const { return vector3( this->values[ 0 ] * scalar, this->values[ 1 ] * scalar, this->values[ 2 ] * scalar ); }
-  const vector3< T >& operator*=( const T& scalar ) { this->values[ 0 ] *= scalar, this->values[ 1 ] *= scalar, this->values[ 2 ] *= scalar; return *this; }
+	const vector3< T > operator-( const vector3< T >& other ) const { return vector3( this->values[ 0 ] - other.values[ 0 ], this->values[ 1 ] - other.values[ 1 ], this->values[ 2 ] - other.values[ 2 ]); }
+	const vector3< T >& operator-=( const vector3< T >& other ) { this->values[ 0 ] -= other.values[ 0 ], this->values[ 1 ] -= other.values[ 1 ], this->values[ 2 ] -= other.values[ 2 ]; return *this; }
 
-  const vector3< T > operator/( const T& scalar ) const { return vector3( this->values[ 0 ] / scalar, this->values[ 1 ] / scalar, this->values[ 2 ] / scalar ); }
-  const vector3< T >& operator/=( const T& scalar ) { this->values[ 0 ] /= scalar, this->values[ 1 ] /= scalar, this->values[ 2 ] /= scalar; return *this; }
+	//  multiplication/division by a scalar of the same type - scale each element
+	const vector3< T > operator*( const T& scalar ) const { return vector3( this->values[ 0 ] * scalar, this->values[ 1 ] * scalar, this->values[ 2 ] * scalar ); }
+	const vector3< T >& operator*=( const T& scalar ) { this->values[ 0 ] *= scalar, this->values[ 1 ] *= scalar, this->values[ 2 ] *= scalar; return *this; }
 
-  //  multiplication by a vector of the same type - elementwise multiply (hadamard product)
-  const vector3< T > operator*( const vector3< T >& other ) const { return vector3( this->values[ 0 ] * other.values[ 0 ], this->values[ 1 ] * other.values[ 1 ], this->values[ 2 ] * other.values[ 2 ] ); }
-  const vector3< T >& operator*=( const vector3< T >& other ) { this->values[ 0 ] *= other.values[ 0 ], this->values[ 1 ] *= other.values[ 1 ], this->values[ 2 ] *= other.values[ 2 ]; return *this; }
+	const vector3< T > operator/( const T& scalar ) const { return vector3( this->values[ 0 ] / scalar, this->values[ 1 ] / scalar, this->values[ 2 ] / scalar ); }
+	const vector3< T >& operator/=( const T& scalar ) { this->values[ 0 ] /= scalar, this->values[ 1 ] /= scalar, this->values[ 2 ] /= scalar; return *this; }
 
-  //  division by a vector of the same type - elementwise divide
-  const vector3< T > operator/( const vector3< T >& other ) const { return vector3( this->values[ 0 ] / other.values[ 0 ], this->values[ 1 ] / other.values[ 1 ], this->values[ 2 ] / other.values[ 2 ]); }
-  const vector3< T >& operator/=( const vector3< T >& other ) { this->values[ 0 ] /= other.values[ 0 ], this->values[ 1 ] /= other.values[ 1 ], this->values[ 2 ] /= other.values[ 2 ]; return *this; }
+	//  multiplication by a vector of the same type - elementwise multiply (hadamard product)
+	const vector3< T > operator*( const vector3< T >& other ) const { return vector3( this->values[ 0 ] * other.values[ 0 ], this->values[ 1 ] * other.values[ 1 ], this->values[ 2 ] * other.values[ 2 ] ); }
+	const vector3< T >& operator*=( const vector3< T >& other ) { this->values[ 0 ] *= other.values[ 0 ], this->values[ 1 ] *= other.values[ 1 ], this->values[ 2 ] *= other.values[ 2 ]; return *this; }
+
+	//  division by a vector of the same type - elementwise divide
+	const vector3< T > operator/( const vector3< T >& other ) const { return vector3( this->values[ 0 ] / other.values[ 0 ], this->values[ 1 ] / other.values[ 1 ], this->values[ 2 ] / other.values[ 2 ]); }
+	const vector3< T >& operator/=( const vector3< T >& other ) { this->values[ 0 ] /= other.values[ 0 ], this->values[ 1 ] /= other.values[ 1 ], this->values[ 2 ] /= other.values[ 2 ]; return *this; }
 };
 
 // addition/subtraction in the other order
@@ -132,18 +144,21 @@ const T len( vector3< T > v ) { return sqrt( len2( v ) ); }
 template < class T > // return unit length colinear vector
 const vector3< T > normalize( vector3< T > in ) { T length = len( in ); return in / length; }
 
+template < class T > // elementwise absolute value
+vector3< T > abs( vector3< T > v ) { return vector3< T >( abs( v.values[ 0 ] ), abs( v.values[ 1 ] ), abs( v.values[ 2 ] ) ); }
+
 template < class T > //  cross product
 const vector3< T > cross( vector3< T > a, vector3< T > b ) {
-  vector3< T > product;
-  product.values[ 0 ] =    a.values[ 1 ] * b.values[ 2 ] - a.values[ 2 ] * b.values[ 1 ];
-  product.values[ 1 ] = -( a.values[ 0 ] * b.values[ 2 ] - a.values[ 2 ] * b.values[ 0 ] );
-  product.values[ 2 ] =    a.values[ 0 ] * b.values[ 1 ] - a.values[ 1 ] * b.values[ 0 ];
-  return product;
+	vector3< T > product;
+	product.values[ 0 ] =    a.values[ 1 ] * b.values[ 2 ] - a.values[ 2 ] * b.values[ 1 ];
+	product.values[ 1 ] = -( a.values[ 0 ] * b.values[ 2 ] - a.values[ 2 ] * b.values[ 0 ] );
+	product.values[ 2 ] =    a.values[ 0 ] * b.values[ 1 ] - a.values[ 1 ] * b.values[ 0 ];
+	return product;
 }
 
 template < class T > // reflect function
 const vector3< T > reflect( vector3< T > i, vector3< T > n ){
-  return i - 2.0 * dot( n, i ) * n;
+	return i - 2.0 * dot( n, i ) * n;
 }
 
 // refract function would make sense to add
