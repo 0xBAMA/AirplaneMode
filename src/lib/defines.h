@@ -9,12 +9,12 @@ using vec2 = vector2< baseType >;
 using vec3 = vector3< baseType >;
 
 // render parameters
-constexpr long long X_IMAGE_DIM = 1920;
-constexpr long long Y_IMAGE_DIM = 1080;
+constexpr long long X_IMAGE_DIM = 1920/4;
+constexpr long long Y_IMAGE_DIM = 1080/4;
 constexpr long long TILESIZE_XY = 32;
 constexpr long long MAX_BOUNCES = 96;
-constexpr long long NUM_SAMPLES = 256;
-constexpr long long NUM_THREADS = 17;
+constexpr long long NUM_SAMPLES = 32;
+constexpr long long NUM_THREADS = 5;
 constexpr baseType  IMAGE_GAMMA = 2.2;
 constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
 constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max() ) / 10.0;

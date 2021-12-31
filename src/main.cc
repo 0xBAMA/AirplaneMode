@@ -6,7 +6,7 @@
 #include <random>				// prng
 #include <string>				// std::string
 #include <sstream>			// std::stringstream
-#include <algorithm>			// clamp
+#include <algorithm>		// clamp
 #include <atomic>				// atomic_llong
 #include <thread>				// threads
 #include <memory>				// shared_ptr
@@ -21,7 +21,7 @@ using std::make_shared;
 // primitives
 #include "lib/primitives.h"
 
-// config 
+// config
 #include "lib/defines.h"
 
 // image input
@@ -101,10 +101,10 @@ vec3 palette( baseType t ) {
 			a = vec3( 0.50, 0.50, 0.50 );
 			b = vec3( 0.50, 0.50, 0.50 );
 			c = vec3( 1.00, 0.70, 0.40 );
-			d = vec3( 0.00, 0.15, 0.20 );		
+			d = vec3( 0.00, 0.15, 0.20 );
 			break;
-		
-		default: break;		
+
+		default: break;
 	}
 	vec3 temp = ( c * t + d ) * 2.0 * pi;
 	return a + b * vec3( cos( temp.values[ 0 ] ), cos( temp.values[ 1 ] ), cos( temp.values[ 2 ] ) );
@@ -188,6 +188,36 @@ public:
 		}
 	}
 
+	void recursiveWangSplit( vec3 min, vec3 max, int previousAxisPick, wang myWang, int depth ) {
+		if( length( min - max ) < BOX_EPSILON ||
+				abs( max.values[ 0 ] - min.values[ 0 ] ) < BOX_EPSILON / 10.0 ||
+				abs( max.values[ 1 ] - min.values[ 1 ] ) < BOX_EPSILON / 10.0 ||
+				abs( max.values[ 2 ] - min.values[ 2 ] ) < BOX_EPSILON / 10.0 )
+			return;
+
+		// for( int i = 0; i < depth; i++ ) myWang.getNum(); // cycle it a few times
+
+		// if( myWang.getNum() < 0.01 && rng( gen ) < 0.5 ) {
+		if( myWang.getNum() * depth > 0.45 * depth  ) {
+			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), myWang.getNum() < 0.3 ? 3 : 1 ) ); // shrink slightly, to create gaps
+		} else {
+			int axisPick; // pick an axis, make sure it's different than the previousy picked one
+			while( previousAxisPick == ( axisPick = int( floor( myWang.getNum() * 3.0 ) ) ) );
+
+			// baseType axisSplit = ( myWang.getNum() ) + 0.15; // get a value 0-1 to split by
+			baseType axisSplit = 0.5;
+			baseType midpointLoc = ( max.values[ axisPick ] - min.values[ axisPick ] ) * axisSplit + min.values[ axisPick ];
+
+			// generate the aabb dimensions for the two split boxes
+			vec3 minMiddle = min; minMiddle.values[ axisPick ] = midpointLoc;
+			vec3 maxMiddle = max; maxMiddle.values[ axisPick ] = midpointLoc;
+
+			// recurse, branch in 2 split on that axis
+			recursiveWangSplit( min, maxMiddle, axisPick, myWang, depth + 1 );
+			recursiveWangSplit( minMiddle, max, axisPick, myWang, depth + 1 );
+		}
+	}
+
 
 	void recursiveMultiSplit( vec3 min, vec3 max, int previousAxisPick ) {
 	// five options:
@@ -264,6 +294,7 @@ public:
 		}
 	}
 
+	// validating deterministic wang rng logic
 	void recursive( wang myWang, int depth ){
 		if( depth == 5 ) return;
 		cout << "seeing " << myWang.getNum() << " at depth " << depth << endl;
@@ -291,13 +322,8 @@ public:
 		// contents.push_back( make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
 
-
-
-
-
-
 		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
-			contents.push_back( make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( randomUnitVector( gen ) * 1.4, 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
 			// int select = int( floor( rng( gen ) * 3.0 ) );
 			// vec3 v0 = randomVector( gen );
@@ -309,17 +335,24 @@ public:
 
 
 
+		wang myWang( 69420 * rng( gen ) * 10000 );
 
 
 		// recursiveSplit( vec3( -1.0 ), vec3( 1.0 ), 0 );
-		recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
+		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
+
+		float x, y, z;
+		x = rng( gen );
+		y = rng( gen );
+		z = rng( gen );
+
+		recursiveWangSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ), myWang, 0 );
 
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
 		// recursiveWangMultiSplit( vec3( -1.0 ), vec3( 1.0 ), 1, 69420 * rng( gen ) );
 		// cout << "drawing with " << contents.size() << " primitives " << endl;
 
-		//wang myWang( 69420 );
 		//recursive( myWang, 0 );
 		//cout << endl;
 
