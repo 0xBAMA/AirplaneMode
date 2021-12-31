@@ -6,7 +6,7 @@
 #include <random>				// prng
 #include <string>				// std::string
 #include <sstream>			// std::stringstream
-#include <algorithm>		// clamp
+#include <algorithm>			// clamp
 #include <atomic>				// atomic_llong
 #include <thread>				// threads
 #include <memory>				// shared_ptr
@@ -18,6 +18,12 @@ using std::make_shared;
 // my vector library
 #include "lib/vector.h"
 
+// primitives
+#include "lib/primitives.h"
+
+// config 
+#include "lib/defines.h"
+
 // image input
 #define STB_IMAGE_IMPLEMENTATION
 #include "lib/stb_image.h"
@@ -25,49 +31,6 @@ using std::make_shared;
 // image output
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "lib/stb_image_write.h"
-
-// default types
-#define baseType double
-using vec2 = vector2< baseType >;
-using vec3 = vector3< baseType >;
-
-// render parameters
-constexpr long long X_IMAGE_DIM = 1920/4;
-constexpr long long Y_IMAGE_DIM = 1080/4;
-constexpr long long TILESIZE_XY = 16;
-constexpr long long MAX_BOUNCES = 20;
-constexpr long long NUM_SAMPLES = 32;
-constexpr long long NUM_THREADS = 5;
-constexpr baseType  IMAGE_GAMMA = 2.2;
-constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
-constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max() ) / 10.0;
-constexpr baseType  FIELD_OF_VIEW = 0.5;
-constexpr baseType  PALETTE_SCALAR = 16.18;
-constexpr baseType  BRIGHTNESS_SCALAR = 16.18;
-constexpr baseType  BOX_EPSILON = 0.1618;
-constexpr long long REPORT_DELAY = 32; 				// reporter thread sleep duration, in ms
-constexpr long long NUM_PRIMITIVES = 69;
-constexpr long long PROGRESS_INDICATOR_STOPS = 69; // cli spaces to take up
-
-
-
-
-// ray representation (origin+direction)
-struct ray {
-	vec3 origin;
-	vec3 direction;
-};
-
-// represents a ray hit and the associated information
-struct hitrecord {									// hit record
-	vec3 position;										// position
-	vec3 normal;											// normal
-	baseType dtransit = DMAX_TRAVEL;	// how far the ray traveled, initially very large
-	int materialID = -1;							// material (indexed into scene list)
-	int primitiveID = 0;							// so you can refer to the values for this primitive later
-	vec2 uv;													// used for triangles, barycentric coords
-	bool front;												// hit on frontfacing side
-};
 
 class wang {
 public:
@@ -94,13 +57,7 @@ public:
 };
 
 
-
-
-
-
-
-
-// Random Utilities
+// std::random Utilities
 baseType rng( std::shared_ptr< std::mt19937_64 > gen ) { // gives a value in the range 0.-1.
 	std::uniform_real_distribution< baseType > distribution( 0., 1. );
 	return distribution( *gen );
@@ -124,212 +81,35 @@ vec3 random_in_unit_disk( std::shared_ptr< std::mt19937_64 > gen ) { // random i
 
 
 // iq style palettes
-vec3 paletteA = vec3( 0.50, 0.50, 0.50 );
-vec3 paletteB = vec3( 0.50, 0.50, 0.50 );
-vec3 paletteC = vec3( 1.00, 1.00, 1.00 );
-vec3 paletteD = vec3( 0.00, 0.10, 0.20 );
-
-// vec3 paletteA = vec3( 0.50, 0.50, 0.50 );
-// vec3 paletteB = vec3( 0.50, 0.50, 0.50 );
-// vec3 paletteC = vec3( 1.00, 1.00, 0.50 );
-// vec3 paletteD = vec3( 0.80, 0.90, 0.30 );
-
-// vec3 paletteA = vec3( 0.50, 0.50, 0.50 );
-// vec3 paletteB = vec3( 0.50, 0.50, 0.50 );
-// vec3 paletteC = vec3( 1.00, 0.70, 0.40 );
-// vec3 paletteD = vec3( 0.00, 0.15, 0.20 );
-
-vec3 palette( baseType t,
-	vec3 a = paletteA,
-	vec3 b = paletteB,
-	vec3 c = paletteC,
-	vec3 d = paletteD ) {
+int paletteToUse = 0;
+vec3 palette( baseType t ) {
+	vec3 a, b, c, d;
+	switch ( paletteToUse ) {
+		case 0:
+			a = vec3( 0.50, 0.50, 0.50 );
+			b = vec3( 0.50, 0.50, 0.50 );
+			c = vec3( 1.00, 1.00, 1.00 );
+			d = vec3( 0.00, 0.10, 0.20 );
+			break;
+		case 1:
+			a = vec3( 0.50, 0.50, 0.50 );
+			b = vec3( 0.50, 0.50, 0.50 );
+			c = vec3( 1.00, 1.00, 0.50 );
+			d = vec3( 0.80, 0.90, 0.30 );
+			break;
+		case 2:
+			a = vec3( 0.50, 0.50, 0.50 );
+			b = vec3( 0.50, 0.50, 0.50 );
+			c = vec3( 1.00, 0.70, 0.40 );
+			d = vec3( 0.00, 0.15, 0.20 );		
+			break;
+		
+		default: break;		
+	}
 	vec3 temp = ( c * t + d ) * 2.0 * pi;
 	return a + b * vec3( cos( temp.values[ 0 ] ), cos( temp.values[ 1 ] ), cos( temp.values[ 2 ] ) );
 }
 
-class primitive { // base class for primitives
-public:
-	virtual hitrecord intersect( ray r ) const = 0; // pure virtual, base definition dne
-	int materialID; // indexes into scene material list
-};
-
-// sphere
-class sphere : public primitive {
-public:
-	sphere( vec3 c, baseType r, int m ) : center( c ), radius( r ) { materialID = m; }
-	hitrecord intersect( ray r ) const override {
-		hitrecord h; h.dtransit = DMAX_TRAVEL;
-		vec3 disp = r.origin - center;
-		baseType b = dot( r.direction, disp );
-		baseType c = dot( disp, disp ) - radius * radius;
-		baseType des = b * b - c; // b squared minus c - discriminant of the quadratic
-		if( des >= 0.0 ){ // hit at either one or two points
-			baseType d = std::min( std::max( -b + std::sqrt( des ), 0.0 ), std::max( -b - std::sqrt( des ), 0.0 ) );
-			if( d >= 0.0 ){ // make sure at least one intersection point is in front of the camera before continuing
-				h.dtransit = d;
-				h.materialID = materialID;
-				h.position = r.origin + h.dtransit * r.direction;
-				h.normal = normalize( h.position - center );
-				h.front = dot( h.normal, r.direction ) < 0.0 ? true : false;
-			}
-		}
-		return h;
-	}
-	private:  // geometry parameters
-		vec3 center;
-		baseType radius;
-};
-
-// triangle
-class triangle : public primitive {
-public:
-	triangle( vec3 p0, vec3 p1, vec3 p2, int m ) : points{ p0, p1, p2 } { materialID = m; }
-	hitrecord intersect ( ray r ) const override { // Möller–Trumbore intersection algorithm
-		hitrecord hit;  hit.dtransit = DMAX_TRAVEL;
-		const vec3 edge1 = points[ 1 ] - points[ 0 ];
-		const vec3 edge2 = points[ 2 ] - points[ 0 ];
-		const vec3 pvec = cross( r.direction, edge2 );
-		const baseType determinant = dot( edge1, pvec );
-		if ( determinant > -HIT_EPSILON && determinant < HIT_EPSILON )
-			return hit; // no hit, return
-
-		const baseType inverseDeterminant = 1.0f / determinant;
-		const vec3 tvec = r.origin - points[ 0 ];
-		hit.uv.values[ 0 ] = dot( tvec, pvec ) * inverseDeterminant; // u value
-		if ( hit.uv.values[ 0 ] < 0.0f || hit.uv.values[ 0 ] > 1.0f )
-			return hit; // no hit, return
-
-		const vec3 qvec = cross( tvec, edge1 );
-		hit.uv.values[ 1 ] = dot( r.direction, qvec ) * inverseDeterminant; // v value
-		if ( hit.uv.values[ 1 ] < 0.0f || hit.uv.values[ 0 ] + hit.uv.values[ 1 ] > 1.0f )
-			return hit; // no hit, return
-
-		hit.dtransit = dot( edge2, qvec ) * inverseDeterminant; // distance term to hit
-		hit.position = points[ 0 ] + hit.uv.values[ 0 ] * edge2 + hit.uv.values[ 1 ] * edge1;
-		hit.normal = cross( edge1, edge2 );
-		hit.materialID = materialID;
-		hit.front = dot( hit.normal, r.direction ) < 0.0 ? true : false; // determine front or back
-
-		return hit; // return true result with all relevant info
-	}
-private:  // geometry parameters
-	vec3 points[ 3 ];
-};
-
-
-// axis aligned bounding box
-class aabb : public primitive {
-public:
-	aabb( vec3 mins, vec3 maxs, int m ) : bounds{ mins, maxs } {
-		materialID = m;
-		vec3 tempMins = vec3( std::min( bounds[ 0 ].values[ 0 ], bounds[ 1 ].values[ 0 ] ), std::min( bounds[ 0 ].values[ 1 ], bounds[ 1 ].values[ 1 ] ), std::min( bounds[ 0 ].values[ 2 ], bounds[ 1 ].values[ 2 ] ) );
-		vec3 tempMaxs = vec3( std::max( bounds[ 0 ].values[ 0 ], bounds[ 1 ].values[ 0 ] ), std::max( bounds[ 0 ].values[ 1 ], bounds[ 1 ].values[ 1 ] ), std::max( bounds[ 0 ].values[ 2 ], bounds[ 1 ].values[ 2 ] ) );
-		bounds[ 0 ] = tempMins;
-		bounds[ 1 ] = tempMaxs;
-  }
-
-	//	Alexander Majercik, Cyril Crassin, Peter Shirley, Morgan McGuire
-	//	A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering
-	//	Journal of Computer Graphics Techniques Vol. 7, No. 3, 2018
-	// bool slabs( vec3 corner0, vec3 corner1, vec3 rayOrigin, vec3 rayDir ) {
-	// 	vec3 invRaydir = vec3( 1.0 ) / rayDir;
-	// 	vec3 t0 = ( corner0 - rayOrigin ) * invRaydir;
-	// 	vec3 t1 = ( corner1 - rayOrigin ) * invRaydir;
-	// 	vec3 tmin = min( t0, t1 ); // min on each x,y,z
-	// 	vec3 tmax = max( t0, t1 ); // max on each x,y,z
-	// 	return max_component(tmin) <= min_component(tmax); // boolean hit
-	// }
-
-
-	//	Amy Williams, Steve Barrus, R. Keith Morley, and Peter Shirley
-	//	"An Efficient and Robust Ray-Box Intersection Algorithm"
-	//	Journal of graphics tools, 10(1):49-54, 2005
-	hitrecord intersect ( ray r ) const override {
-		hitrecord hit; // initially at max distance
-
-		baseType t0 = 0.0, t1 = DMAX_TRAVEL;
-		baseType tmin, tmax, tymin, tymax, tzmin, tzmax;
-		if (r.direction.x() >= 0) {
-			tmin = (bounds[0].x() - r.origin.x()) / r.direction.x();
-			tmax = (bounds[1].x() - r.origin.x()) / r.direction.x();
-		}	else {
-			tmin = (bounds[1].x() - r.origin.x()) / r.direction.x();
-			tmax = (bounds[0].x() - r.origin.x()) / r.direction.x();
-		}
-		if (r.direction.y() >= 0) {
-			tymin = (bounds[0].y() - r.origin.y()) / r.direction.y();
-			tymax = (bounds[1].y() - r.origin.y()) / r.direction.y();
-		}
-		else {
-			tymin = (bounds[1].y() - r.origin.y()) / r.direction.y();
-			tymax = (bounds[0].y() - r.origin.y()) / r.direction.y();
-		}
-		if ( (tmin > tymax) || (tymin > tmax) ){
-			tmin = DMAX_TRAVEL;
-			goto end;
-		}
-		if (tymin > tmin)
-			tmin = tymin;
-		if (tymax < tmax)
-			tmax = tymax;
-		if (r.direction.z() >= 0) {
-			tzmin = (bounds[0].z() - r.origin.z()) / r.direction.z();
-			tzmax = (bounds[1].z() - r.origin.z()) / r.direction.z();
-		} else {
-			tzmin = (bounds[1].z() - r.origin.z()) / r.direction.z();
-			tzmax = (bounds[0].z() - r.origin.z()) / r.direction.z();
-		}
-		if ( (tmin > tzmax) || (tzmin > tmax) ){
-			tmin = DMAX_TRAVEL;
-			goto end;
-		}
-		if (tzmin > tmin)
-			tmin = tzmin;
-		if (tzmax < tmax)
-			tmax = tzmax;
-		if ( (tmin > t1) || (tmax < t0) ) {
-			tmin = DMAX_TRAVEL;
-			goto end;
-		}
-
-
-	end:
-		hit.dtransit = std::min( DMAX_TRAVEL, tmin );
-		hit.position = r.origin + hit.dtransit * r.direction;
-
-		// WIP - selection based on hit face
-		baseType dMX = abs( bounds[ 0 ].values[ 0 ] - hit.position.values[ 0 ] );
-		baseType dPX = abs( bounds[ 1 ].values[ 0 ] - hit.position.values[ 0 ] );
-		baseType dMY = abs( bounds[ 0 ].values[ 1 ] - hit.position.values[ 1 ] );
-		baseType dPY = abs( bounds[ 1 ].values[ 1 ] - hit.position.values[ 1 ] );
-		baseType dMZ = abs( bounds[ 0 ].values[ 2 ] - hit.position.values[ 2 ] );
-		baseType dPZ = abs( bounds[ 1 ].values[ 2 ] - hit.position.values[ 2 ] );
-		baseType dmin = std::min( std::min( dMX, dPX ), std::min( std::min( dMY, dPY ), std::min( dMZ, dPZ ) ) );
-		if ( dmin == dMX ) {
-			hit.normal = vec3( -1.0,  0.0,  0.0 );
-		} else if ( dmin == dPX ) {
-			hit.normal = vec3(  1.0,  0.0,  0.0 );
-		} else if ( dmin == dMY ) {
-			hit.normal = vec3(  0.0, -1.0,  0.0 );
-		} else if ( dmin == dPY ) {
-			hit.normal = vec3(  0.0,  1.0,  0.0 );
-		} else if ( dmin == dMZ ) {
-			hit.normal = vec3(  0.0,  0.0, -1.0 );
-		} else if ( dmin == dPZ ) {
-			hit.normal = vec3(  0.0,  0.0,  1.0 );
-		}
-
-		hit.materialID = materialID;
-		hit.front = dot( hit.normal, r.direction ) < 0.0 ? true : false;
-
-		// send back the hit record
-		return hit;
-	}
-
-private: // geometry parameters : min ( index 0 ), max ( index 1 ) on x,y,z axis
-	vec3 bounds[ 2 ];
-};
 
 
 //   todo : material handling
@@ -516,32 +296,32 @@ public:
 
 
 
-		// for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
-			// contents.push_back( make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
+			contents.push_back( make_shared< sphere >( randomUnitVector( gen ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
 			// int select = int( floor( rng( gen ) * 3.0 ) );
 			// vec3 v0 = randomVector( gen );
 			// vec3 v1 = randomVector( gen );
 
 			// contents.push_back( make_shared< aabb >( vec3( std::min( v0.values[ 0 ], v1.values[ 0 ] ), std::min( v0.values[ 1 ], v1.values[ 1 ] ), std::min( v0.values[ 2 ], v1.values[ 2 ] ) ),
-																					// vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), rng( gen ) < 0.5 ? 3 : 1 ) );
-		// }
+				//																	vec3( std::max( v0.values[ 0 ], v1.values[ 0 ] ), std::max( v0.values[ 1 ], v1.values[ 1 ] ), std::max( v0.values[ 2 ], v1.values[ 2 ] ) ), rng( gen ) < 0.5 ? 3 : 1 ) );
+		}
 
 
 
 
 
 		// recursiveSplit( vec3( -1.0 ), vec3( 1.0 ), 0 );
-		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
+		recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
 
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
 		// recursiveWangMultiSplit( vec3( -1.0 ), vec3( 1.0 ), 1, 69420 * rng( gen ) );
 		// cout << "drawing with " << contents.size() << " primitives " << endl;
 
-		wang myWang( 69420 );
-		recursive( myWang, 0 );
-		cout << endl;
+		//wang myWang( 69420 );
+		//recursive( myWang, 0 );
+		//cout << endl;
 
 
 	}
@@ -575,10 +355,10 @@ public:
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		// while ( s.contents.size() < 10 ) {
+		while ( s.contents.size() < 10 ) {
 			s.clear();
 			s.populate();
-		// }
+		}
 
 		c.lookat( randomUnitVector( gen[ 0 ] ) * ( 2.2 + rng( gen[ 0 ] ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
@@ -718,7 +498,7 @@ private:
 				throughput *= vec3( 0.89 );
 			} else if ( h.materialID == 1 ) {
 				// current += throughput * abs( h.normal );
-				current += throughput * palette( ( 2.2 / NUM_PRIMITIVES ) * h.primitiveID );
+				current += throughput * palette( ( 2.2 / NUM_PRIMITIVES ) * h.primitiveID * PALETTE_SCALAR );
 			} else if ( h.materialID == 3 ) {
 				throughput *= vec3( 0.65 );
 			}
@@ -751,12 +531,12 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	// for ( size_t i = 0; i <= 1; i++ ) {
-		int i = 0;
-		std::stringstream s; s << "outputs/o" << std::to_string( i ) << ".png";
+	for ( size_t i = 224; i <= 235; i++ ) {
+		paletteToUse = i%3;
+		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
 		renderer r;
 		r.renderAndSaveTo( s.str() );
-	// }
+	}
 
 	cout << "Total Render Time: " <<
 		duration_cast< milliseconds >( high_resolution_clock::now() - tstart ).count() / 1000.0
