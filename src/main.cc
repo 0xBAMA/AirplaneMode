@@ -79,12 +79,12 @@ public:
 		seed *= 2654435769;
 		seed += ( seed << 5 ) ^ ( seed >> 12 );
 //--
-		seed += ~(seed << 15);
-		seed ^= (seed >> 10);
-		seed += (seed << 3);
-		seed ^= (seed >> 6);
-		seed += ~(seed << 11);
-		seed ^= (seed >> 16);
+		// seed += ~(seed << 15);
+		// seed ^= (seed >> 10);
+		// seed += (seed << 3);
+		// seed ^= (seed >> 6);
+		// seed += ~(seed << 11);
+		// seed ^= (seed >> 16);
 	}
 
 	baseType getNum() {
@@ -444,11 +444,7 @@ public:
 		}
 	}
 
-	void recursiveWangMultiSplit( vec3 min, vec3 max, int previousAxisPick, uint32_t seed ) {
-		wang myWang( seed + 5 );
-		myWang.getNum();
-		myWang.getNum();
-
+	void recursiveWangMultiSplit( vec3 min, vec3 max, int previousAxisPick, wang myWang ) {
 	// five options:
 		// epsilon condition and break
 		// draw box and break
@@ -483,9 +479,16 @@ public:
 				cutMin.values[ axisPick ] += sectionWidth;
 				cutMax.values[ axisPick ] += sectionWidth;
 				// recursive call
-				recursiveWangMultiSplit( cutMin, cutMax, axisPick, myWang.seed );
+				recursiveWangMultiSplit( cutMin, cutMax, axisPick, myWang );
 			}
 		}
+	}
+
+	void recursive( wang myWang, int depth ){
+		if( depth == 5 ) return;
+		cout << "seeing " << myWang.getNum() << " at depth " << depth << endl;
+		recursive( myWang, depth + 1 );
+		recursive( myWang, depth + 1 );
 	}
 
 	void populate(){
@@ -533,14 +536,12 @@ public:
 
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
-		recursiveWangMultiSplit( vec3( -1.0 ), vec3( 1.0 ), 1, 69420 * rng( gen ) );
-		cout << "drawing with " << contents.size() << " primitives " << endl;
+		// recursiveWangMultiSplit( vec3( -1.0 ), vec3( 1.0 ), 1, 69420 * rng( gen ) );
+		// cout << "drawing with " << contents.size() << " primitives " << endl;
 
-		// wang myWang( 69420 * rng( gen ) );
-		// for( int i = 0; i < 100; i++ ) {
-		// 	cout << myWang.getNum() << endl;
-		// }
-		// cout << endl;
+		wang myWang( 69420 );
+		recursive( myWang, 0 );
+		cout << endl;
 
 
 	}
@@ -574,10 +575,10 @@ public:
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		while ( s.contents.size() < 10 ) {
+		// while ( s.contents.size() < 10 ) {
 			s.clear();
 			s.populate();
-		}
+		// }
 
 		c.lookat( randomUnitVector( gen[ 0 ] ) * ( 2.2 + rng( gen[ 0 ] ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
@@ -750,11 +751,12 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	for ( size_t i = 0; i <= 18; i++ ) {
+	// for ( size_t i = 0; i <= 1; i++ ) {
+		int i = 0;
 		std::stringstream s; s << "outputs/o" << std::to_string( i ) << ".png";
 		renderer r;
 		r.renderAndSaveTo( s.str() );
-	}
+	// }
 
 	cout << "Total Render Time: " <<
 		duration_cast< milliseconds >( high_resolution_clock::now() - tstart ).count() / 1000.0
