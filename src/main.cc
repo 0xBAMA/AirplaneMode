@@ -32,18 +32,19 @@ using vec2 = vector2< baseType >;
 using vec3 = vector3< baseType >;
 
 // render parameters
-constexpr long long X_IMAGE_DIM = 1920/3;
-constexpr long long Y_IMAGE_DIM = 1080/3;
+constexpr long long X_IMAGE_DIM = 1920/4;
+constexpr long long Y_IMAGE_DIM = 1080/4;
 constexpr long long TILESIZE_XY = 16;
 constexpr long long MAX_BOUNCES = 20;
-constexpr long long NUM_SAMPLES = 100;
+constexpr long long NUM_SAMPLES = 32;
 constexpr long long NUM_THREADS = 5;
 constexpr baseType  IMAGE_GAMMA = 2.2;
 constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
 constexpr baseType  DMAX_TRAVEL = baseType( std::numeric_limits< baseType >::max() ) / 10.0;
-constexpr baseType  FIELD_OF_VIEW = 0.3;
+constexpr baseType  FIELD_OF_VIEW = 0.5;
 constexpr baseType  PALETTE_SCALAR = 16.18;
 constexpr baseType  BRIGHTNESS_SCALAR = 16.18;
+constexpr baseType  BOX_EPSILON = 0.1618;
 constexpr long long REPORT_DELAY = 32; 				// reporter thread sleep duration, in ms
 constexpr long long NUM_PRIMITIVES = 69;
 constexpr long long PROGRESS_INDICATOR_STOPS = 69; // cli spaces to take up
@@ -68,17 +69,34 @@ struct hitrecord {									// hit record
 	bool front;												// hit on frontfacing side
 };
 
-inline uint32_t wangHash( uint32_t& x ){
-	x = ( x ^ 12345391 ) * 2654435769;
-	x ^= ( x << 6 ) ^ ( x >> 26 );
-	x *= 2654435769;
-	x += ( x << 5 ) ^ ( x >> 12 );
-	return x;
-}
+class wang {
+public:
+	wang( uint32_t s ) : seed( s ) {}
+	uint32_t seed;
+	void hash() {
+		seed = ( seed ^ 12345391 ) * 2654435769;
+		seed ^= ( seed << 6 ) ^ ( seed >> 26 );
+		seed *= 2654435769;
+		seed += ( seed << 5 ) ^ ( seed >> 12 );
+//--
+		seed += ~(seed << 15);
+		seed ^= (seed >> 10);
+		seed += (seed << 3);
+		seed ^= (seed >> 6);
+		seed += ~(seed << 11);
+		seed ^= (seed >> 16);
+	}
 
-inline baseType wangFloat( uint32_t seed ) {
-	return baseType( wangHash( seed ) ) / baseType( std::numeric_limits< uint32_t >::max() );
-}
+	baseType getNum() {
+		hash();
+		return baseType( seed ) / 4294967295.0;
+	}
+};
+
+
+
+
+
 
 
 
@@ -356,7 +374,6 @@ public:
 				abs( max.values[ 2 ] - min.values[ 2 ] ) < 0.01 )
 			return;
 
-
 		if( rng( gen ) < 0.1 ) {
 			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), rng( gen ) < 0.3 ? rng( gen ) < 0.2 ? 2 : 3 : 1 ) ); // shrink slightly, to create gaps
 		} else {
@@ -385,7 +402,6 @@ public:
 			// cout << "computed maxMiddle: " << maxMiddle.values[ 0 ] << " " << maxMiddle.values[ 1 ] << " " << maxMiddle.values[ 2 ] << std::endl << std::flush;
 			// cout << endl << endl;
 
-
 			// recurse, branch in 2 split on that axis
 			recursiveSplit( min, maxMiddle /* , axisPick */ );
 			recursiveSplit( minMiddle, max /* , axisPick */ );
@@ -393,27 +409,27 @@ public:
 	}
 
 
-	void recursiveMultiSplit( vec3 min, vec3 max, int previousAxisPick, uint32_t seed ) {
+	void recursiveMultiSplit( vec3 min, vec3 max, int previousAxisPick ) {
 	// five options:
 		// epsilon condition and break
 		// draw box and break
 		// draw no box and break
 		// split box( regular splits ) and recurse
 		// split box( irregular splits ) and recurse
-		if( length( min - max ) < 0.1 || // break on tiny box
-			abs( max.values[ 0 ] - min.values[ 0 ] ) < 0.01 ||
-			abs( max.values[ 1 ] - min.values[ 1 ] ) < 0.01 ||
-			abs( max.values[ 2 ] - min.values[ 2 ] ) < 0.01 ) {
+		if( length( min - max ) < BOX_EPSILON || // break on tiny box
+			abs( max.values[ 0 ] - min.values[ 0 ] ) < BOX_EPSILON / 10.0 ||
+			abs( max.values[ 1 ] - min.values[ 1 ] ) < BOX_EPSILON / 10.0 ||
+			abs( max.values[ 2 ] - min.values[ 2 ] ) < BOX_EPSILON / 10.0 ) {
 			return;
 		} else if ( rng( gen ) < 0.1618 ) { // draw box and break out
 			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), rng( gen ) < 0.3 ? 3 : 1 ) ); // shrink slightly, to create gaps
 			return;
 		} else { // continue down the tree
 			int axisPick;
-			while( previousAxisPick == ( axisPick = int( floor( rng( gen ) * 3.0 ) ) ) ); // replace with wang hash rng
+			while( previousAxisPick == ( axisPick = int( floor( rng( gen ) * 3.0 ) ) ) );
 
 			baseType axisLength = max.values[ axisPick ] - min.values[ axisPick ];
-			int numSplits = 4;	// todo: replace with wang hash rng
+			int numSplits = int( floor( rng( gen ) * 6.0 ) );
 			baseType sectionWidth = axisLength / baseType( numSplits + 1 );	// 1 cuts in 2, 2 cuts in 3...
 
 			vec3 cutMin = min, cutMax = max;
@@ -422,8 +438,52 @@ public:
 				// increment to walk along the selected axis
 				cutMin.values[ axisPick ] += sectionWidth;
 				cutMax.values[ axisPick ] += sectionWidth;
-				// recursive calls
-				recursiveMultiSplit( cutMin, cutMax, axisPick, seed );
+				// recursive call
+				recursiveMultiSplit( cutMin, cutMax, axisPick );
+			}
+		}
+	}
+
+	void recursiveWangMultiSplit( vec3 min, vec3 max, int previousAxisPick, uint32_t seed ) {
+		wang myWang( seed + 5 );
+		myWang.getNum();
+		myWang.getNum();
+
+	// five options:
+		// epsilon condition and break
+		// draw box and break
+		// draw no box and break
+		// split box( regular splits ) and recurse
+		// split box( irregular splits ) and recurse
+
+		if( length( min - max ) < BOX_EPSILON || // break on tiny box
+			abs( max.values[ 0 ] - min.values[ 0 ] ) < BOX_EPSILON / 10.0 ||
+			abs( max.values[ 1 ] - min.values[ 1 ] ) < BOX_EPSILON / 10.0 ||
+			abs( max.values[ 2 ] - min.values[ 2 ] ) < BOX_EPSILON / 10.0 ) {
+				// cout << " breaking on epsilon " << endl;
+			return;
+		} else if ( myWang.getNum() < 0.1618 ) { // draw box and break out
+			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), myWang.getNum() < 0.3 ? 3 : 1 ) ); // shrink slightly, to create gaps
+			// cout << "drawing box " << contents.size();
+			return;
+		} else { // continue down the tree
+			// cout << " branching " << endl;
+			int axisPick;
+			// while( previousAxisPick == ( axisPick = int( floor( myWang.getNum() * 3.0 ) ) ) );
+			axisPick = int( floor( myWang.getNum() * 3.0 ) );
+
+			baseType axisLength = max.values[ axisPick ] - min.values[ axisPick ];
+			int numSplits = int( floor( myWang.getNum() * 6.0 ) );	// todo: replace with wang hash rng
+			baseType sectionWidth = axisLength / baseType( numSplits + 1 );	// 1 cuts in 2, 2 cuts in 3...
+
+			vec3 cutMin = min, cutMax = max;
+			cutMax.values[ axisPick ] = cutMin.values[ axisPick ] + sectionWidth;
+			for ( int i = 0; i <= numSplits; i++ ) {
+				// increment to walk along the selected axis
+				cutMin.values[ axisPick ] += sectionWidth;
+				cutMax.values[ axisPick ] += sectionWidth;
+				// recursive call
+				recursiveWangMultiSplit( cutMin, cutMax, axisPick, myWang.seed );
 			}
 		}
 	}
@@ -470,7 +530,18 @@ public:
 
 		// recursiveSplit( vec3( -1.0 ), vec3( 1.0 ), 0 );
 		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
-		recursiveMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 );
+
+
+		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
+		recursiveWangMultiSplit( vec3( -1.0 ), vec3( 1.0 ), 1, 69420 * rng( gen ) );
+		cout << "drawing with " << contents.size() << " primitives " << endl;
+
+		// wang myWang( 69420 * rng( gen ) );
+		// for( int i = 0; i < 100; i++ ) {
+		// 	cout << myWang.getNum() << endl;
+		// }
+		// cout << endl;
+
 
 	}
 	hitrecord rayQuery( ray r ) const {
@@ -498,13 +569,15 @@ public:
 	std::atomic< unsigned long long > tileFinishCounter{ 0 }; // used for status reporting
 	const unsigned long long totalTileCount = std::ceil( X_IMAGE_DIM / TILESIZE_XY ) * ( std::ceil( Y_IMAGE_DIM / TILESIZE_XY ) + 1 );
 
-	renderer() { bytes.resize( xdim * ydim * 4, 0 ); s.populate(); rng_seed(); }
+	renderer() { bytes.resize( xdim * ydim * 4, 0 ); rng_seed(); }
 	void renderAndSaveTo( std::string filename ) {
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		s.clear();
-		s.populate();
+		while ( s.contents.size() < 10 ) {
+			s.clear();
+			s.populate();
+		}
 
 		c.lookat( randomUnitVector( gen[ 0 ] ) * ( 2.2 + rng( gen[ 0 ] ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
