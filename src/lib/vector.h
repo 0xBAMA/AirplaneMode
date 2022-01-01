@@ -133,22 +133,22 @@ template < class T >
 const vector3< T > operator/( const T& scalar, const vector3< T >& vec ) { return vector3< T >( vec.values[ 0 ] / scalar, vec.values[ 1 ] / scalar, vec.values[ 2 ] / scalar ); }
 
 template < class T >
-const T dot( vector3< T > v1, vector3< T > v2 ) { return v1.values[ 0 ] * v2.values[ 0 ] + v1.values[ 1 ] * v2.values[ 1 ] + v1.values[ 2 ] * v2.values[ 2 ]; }
+const T dot( const vector3< T > v1, const vector3< T > v2 ) { return v1.values[ 0 ] * v2.values[ 0 ] + v1.values[ 1 ] * v2.values[ 1 ] + v1.values[ 2 ] * v2.values[ 2 ]; }
 
 template < class T > // squared length
-const T lengthSquared( vector3< T > v ) { return dot( v, v ); }
+const T lengthSquared( const vector3< T > v ) { return dot( v, v ); }
 
 template < class T > // vector length
-const T length( vector3< T > v ) { return sqrt( lengthSquared( v ) ); }
+const T length( const vector3< T > v ) { return sqrt( lengthSquared( v ) ); }
 
 template < class T > // return unit length colinear vector
-const vector3< T > normalize( vector3< T > in ) { T len = length( in ); return in / len; }
+const vector3< T > normalize( const vector3< T > in ) { T len = length( in ); return in / len; }
 
 template < class T > // elementwise absolute value
-vector3< T > abs( vector3< T > v ) { return vector3< T >( abs( v.values[ 0 ] ), abs( v.values[ 1 ] ), abs( v.values[ 2 ] ) ); }
+vector3< T > abs( const vector3< T > v ) { return vector3< T >( abs( v.values[ 0 ] ), abs( v.values[ 1 ] ), abs( v.values[ 2 ] ) ); }
 
 template < class T > //  cross product
-const vector3< T > cross( vector3< T > a, vector3< T > b ) {
+const vector3< T > cross( const vector3< T > a, const vector3< T > b ) {
 	vector3< T > product;
 	product.values[ 0 ] =    a.values[ 1 ] * b.values[ 2 ] - a.values[ 2 ] * b.values[ 1 ];
 	product.values[ 1 ] = -( a.values[ 0 ] * b.values[ 2 ] - a.values[ 2 ] * b.values[ 0 ] );
@@ -157,9 +157,21 @@ const vector3< T > cross( vector3< T > a, vector3< T > b ) {
 }
 
 template < class T > // reflect function
-const vector3< T > reflect( vector3< T > i, vector3< T > n ){
+const vector3< T > reflect( const vector3< T > i, const vector3< T > n ){
 	return i - 2.0 * dot( n, i ) * n;
 }
+
+template < class T >
+const vector3< T > mix( const vector3< T > x, const vector3< T > y, const T a ) {
+	return x * ( 1.0 - a ) + y * a;
+}
+
+template < class T > // Rodrigues rotation formula via https://suricrasia.online/demoscene/functions/
+const vector3< T > erot( const vector3< T > point, vector3< T > axis, const T amount ) {
+	axis = normalize( axis );
+	return mix( dot( axis, point ) * axis, point, cos( amount ) ) + cross( axis, point ) * sin( amount );
+}
+
 
 // refract function would make sense to add
 // some of the other demoscene type rotation implementations might make sense as well

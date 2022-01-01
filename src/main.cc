@@ -322,20 +322,36 @@ public:
 		// contents.push_back( make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
 
-		vec3 v1, v2, v3;
-		v1 = randomUnitVector( gen );
-		v2 = randomUnitVector( gen );
-		v3 = randomUnitVector( gen );
+		vec3 v1, v2, v3, v4;
+		v1 = vec3( 0, 0, 1 );
+		v2 = vec3( sqrt( 8.0 / 9.0 ), 0, -1.0 / 3.0 );
+		v3 = vec3( -sqrt( 2.0 / 9.0 ), sqrt( 2.0 / 3.0 ), -1.0 / 3.0 );
+		v4 = vec3( -sqrt( 2.0 / 9.0 ), -sqrt( 2.0 / 3.0 ), -1.0 / 3.0 );
+
+
+		vec3 rotationAxis = randomUnitVector( gen );
+		baseType amount = rng( gen );
+		baseType tetScalar = 1.5;
+
+
+		v1 = tetScalar * erot( v1, rotationAxis, amount );
+		v2 = tetScalar * erot( v2, rotationAxis, amount );
+		v3 = tetScalar * erot( v3, rotationAxis, amount );
+		v4 = tetScalar * erot( v4, rotationAxis, amount );
 
 		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
 
 			// shell
+			contents.push_back( make_shared< sphere >( randomUnitVector( gen ) * 1.4, 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 			contents.push_back( make_shared< sphere >( randomUnitVector( gen ) * 1.4, 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
 			// segments
 			contents.push_back( make_shared< sphere >( v1 + baseType( i ) * ( ( v2 - v1 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 			contents.push_back( make_shared< sphere >( v2 + baseType( i ) * ( ( v3 - v2 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 			contents.push_back( make_shared< sphere >( v3 + baseType( i ) * ( ( v1 - v3 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v1 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v2 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v3 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
 
 
@@ -355,13 +371,8 @@ public:
 		// recursiveSplit( vec3( -1.0 ), vec3( 1.0 ), 0 );
 		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
 
-		float x, y, z;
-		x = rng( gen ) * 0.25 + 0.25;
-		y = rng( gen ) * 0.15 + 0.50;
-		z = rng( gen ) * 0.33 + 0.60;
-
 		// recursiveWangSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ), myWang, 0 );
-		recursiveMultiSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ) );
+		recursiveMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1 );
 
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
@@ -403,7 +414,7 @@ public:
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		while ( s.contents.size() < 10 + NUM_PRIMITIVES * 4 ) {
+		while ( s.contents.size() < 10 + NUM_PRIMITIVES * 8 ) {
 			s.clear();
 			s.populate();
 		}

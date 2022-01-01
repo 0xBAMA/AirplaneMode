@@ -13,11 +13,11 @@ constexpr long long X_IMAGE_DIM = ( 2560 ) / 5;
 constexpr long long Y_IMAGE_DIM = ( 1440 ) / 5;
 constexpr long long TILESIZE_XY = 32;
 constexpr long long MAX_BOUNCES = 96;
-constexpr long long NUM_SAMPLES = 128;
+constexpr long long NUM_SAMPLES = 64;
 constexpr long long NUM_THREADS = 17;
 
-constexpr long long IMAGE_SEQUENCE_START_INDEX = 236;
-constexpr long long IMAGE_SEQUENCE_END_INDEX = 250;
+constexpr long long IMAGE_SEQUENCE_START_INDEX = 260;
+constexpr long long IMAGE_SEQUENCE_END_INDEX = 265;
 
 constexpr baseType  IMAGE_GAMMA = 2.2;
 constexpr baseType  HIT_EPSILON = baseType( std::numeric_limits< baseType >::epsilon() );
