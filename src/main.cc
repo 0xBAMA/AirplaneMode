@@ -231,7 +231,7 @@ public:
 			abs( max.values[ 1 ] - min.values[ 1 ] ) < BOX_EPSILON / 10.0 ||
 			abs( max.values[ 2 ] - min.values[ 2 ] ) < BOX_EPSILON / 10.0 ) {
 			return;
-		} else if ( rng( gen ) < 0.1618 ) { // draw box and break out
+		} else if ( rng( gen ) < 0.1 ) { // draw box and break out
 			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), rng( gen ) < 0.3 ? 3 : 1 ) ); // shrink slightly, to create gaps
 			return;
 		} else { // continue down the tree
@@ -322,8 +322,22 @@ public:
 		// contents.push_back( make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
 
+		vec3 v1, v2, v3;
+		v1 = randomUnitVector( gen );
+		v2 = randomUnitVector( gen );
+		v3 = randomUnitVector( gen );
+
 		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
+
+			// shell
 			contents.push_back( make_shared< sphere >( randomUnitVector( gen ) * 1.4, 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+
+			// segments
+			contents.push_back( make_shared< sphere >( v1 + baseType( i ) * ( ( v2 - v1 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( v2 + baseType( i ) * ( ( v3 - v2 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			contents.push_back( make_shared< sphere >( v3 + baseType( i ) * ( ( v1 - v3 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+
+
 
 			// int select = int( floor( rng( gen ) * 3.0 ) );
 			// vec3 v0 = randomVector( gen );
@@ -342,11 +356,12 @@ public:
 		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
 
 		float x, y, z;
-		x = rng( gen );
-		y = rng( gen );
-		z = rng( gen );
+		x = rng( gen ) * 0.25 + 0.25;
+		y = rng( gen ) * 0.15 + 0.50;
+		z = rng( gen ) * 0.33 + 0.60;
 
-		recursiveWangSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ), myWang, 0 );
+		// recursiveWangSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ), myWang, 0 );
+		recursiveMultiSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ) );
 
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
@@ -388,7 +403,7 @@ public:
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		while ( s.contents.size() < 10 ) {
+		while ( s.contents.size() < 10 + NUM_PRIMITIVES * 4 ) {
 			s.clear();
 			s.populate();
 		}
@@ -564,7 +579,12 @@ int main ( int argc, char const *argv[] ) {
 	// std::string filename = std::string(argv[1]); // from CLI
 	const auto tstart = high_resolution_clock::now();
 
-	for ( size_t i = 224; i <= 235; i++ ) {
+	int numImages = IMAGE_SEQUENCE_END_INDEX - IMAGE_SEQUENCE_START_INDEX;
+	cout << "Drawing " << numImages << "x " << X_IMAGE_DIM << "x" << Y_IMAGE_DIM <<  " images at " << NUM_SAMPLES << "spp with " << MAX_BOUNCES << " max bounces" << endl;
+	cout << "Rendering with " << NUM_THREADS-1 << " worker threads starting at " << IMAGE_SEQUENCE_START_INDEX << endl;
+
+
+	for ( size_t i = IMAGE_SEQUENCE_START_INDEX; i <= IMAGE_SEQUENCE_END_INDEX; i++ ) {
 		paletteToUse = i%3;
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
 		renderer r;
