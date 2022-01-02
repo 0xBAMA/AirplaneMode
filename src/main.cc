@@ -231,7 +231,7 @@ public:
 			abs( max.values[ 1 ] - min.values[ 1 ] ) < BOX_EPSILON / 10.0 ||
 			abs( max.values[ 2 ] - min.values[ 2 ] ) < BOX_EPSILON / 10.0 ) {
 			return;
-		} else if ( rng( gen ) < 0.1 ) { // draw box and break out
+		} else if ( rng( gen ) < 0.1618 ) { // draw box and break out
 			contents.push_back( make_shared< aabb > ( min + vec3( 0.005 ), max - vec3( 0.005 ), rng( gen ) < 0.3 ? 3 : 1 ) ); // shrink slightly, to create gaps
 			return;
 		} else { // continue down the tree
@@ -372,7 +372,7 @@ public:
 		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
 
 		// recursiveWangSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ), myWang, 0 );
-		recursiveMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1 );
+		recursiveMultiSplit( vec3( -1.0, -0.25, -1.5 ), vec3( 1.0, 0.25, 1.5 ), 1 );
 
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
@@ -414,7 +414,7 @@ public:
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		while ( s.contents.size() < 10 + NUM_PRIMITIVES * 8 ) {
+		while ( s.contents.size() < 100 + NUM_PRIMITIVES * 8 ) {
 			s.clear();
 			s.populate();
 		}
@@ -551,13 +551,13 @@ private:
 			// } else if ( h.materialID == 2 ) {
 
 
-
+			static baseType paletteOffset = rng( gen[ 0 ] ) * 5.0;
 			if ( h.materialID == 2 ) {
 				r.direction = reflect( r.origin - old_ro, h.normal );
 				throughput *= vec3( 0.89 );
 			} else if ( h.materialID == 1 ) {
 				// current += throughput * abs( h.normal );
-				current += throughput * palette( ( 2.2 / NUM_PRIMITIVES ) * h.primitiveID * PALETTE_SCALAR );
+				current += throughput * palette( ( 2.2 / NUM_PRIMITIVES ) * h.primitiveID * PALETTE_SCALAR + paletteOffset );
 			} else if ( h.materialID == 3 ) {
 				throughput *= vec3( 0.65 );
 			}
