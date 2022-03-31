@@ -34,7 +34,8 @@ using std::make_shared;
 
 class wang {
 public:
-	wang( uint32_t s ) : seed( s ) {}
+	wang() 							: seed( 0 ) {}
+	wang( uint32_t s ) 	: seed( s ) {}
 	uint32_t seed;
 	void hash() {
 		seed = ( seed ^ 12345391 ) * 2654435769;
@@ -77,6 +78,27 @@ vec3 random_in_unit_disk( std::shared_ptr< std::mt19937_64 > gen ) { // random i
 	vec3 val = randomUnitVector( gen );
 	return vec3( val.values[ 0 ], val.values[ 1 ], 0.0 );
 }
+
+// equivalents for Wang RNG
+baseType rng( wang& gen ) { // gives a value in the range 0.-1.
+	return gen.getNum();
+}
+vec3 randomVector( wang& gen ) { // random vector centered around 0.
+	return vec3( rng( gen ), rng( gen ), rng( gen ) ) - vec3( 0.5 );
+}
+vec3 randomUnitVector( wang& gen ) { // random direction vector (unit length)
+	baseType z = rng( gen ) * 2.0 - 1.0;
+	baseType a = rng( gen ) * 2.0 * pi;
+	baseType r = sqrt( 1.0 - z * z );
+	baseType x = r * cos( a );
+	baseType y = r * sin( a );
+	return vec3( x, y, z );
+}
+vec3 random_in_unit_disk( wang& gen ) { // random in unit disk (xy plane)
+	vec3 val = randomUnitVector( gen );
+	return vec3( val.values[ 0 ], val.values[ 1 ], 0.0 );
+}
+
 
 
 
@@ -302,10 +324,11 @@ public:
 		recursive( myWang, depth + 1 );
 	}
 
-	void populate(){
-		std::random_device r;
-		std::seed_seq s{ r(), r(), r(), r(), r(), r(), r(), r(), r() };
-		gen = make_shared< std::mt19937_64 >( s );
+	void populate( uint32_t seed ){
+		wang genLocal( seed );
+		gen.seed = genLocal.seed;
+
+
 		// for (int i = 0; i < 7; i++)
 			// contents.push_back(make_shared<sphere>(0.8*randomVector(gen), 0.03*rng(gen), 0));
 		// for ( int i = 0; i < NUM_PRIMITIVES; i++ ){
@@ -365,7 +388,7 @@ public:
 
 
 
-		wang myWang( 69420 * rng( gen ) * 10000 );
+		// wang myWang( 69420 * rng( gen ) * 10000 );
 
 
 		// recursiveSplit( vec3( -1.0 ), vec3( 1.0 ), 0 );
@@ -399,7 +422,8 @@ public:
 	std::vector< std::shared_ptr< primitive > > contents; // list of primitives making up the scene
 	// std::vector<std::shared_ptr<material>> materials; // list of materials present in the scene
 
-	std::shared_ptr< std::mt19937_64 > gen;
+	// std::shared_ptr< std::mt19937_64 > gen;
+	wang gen;
 };
 
 
@@ -410,16 +434,19 @@ public:
 	const unsigned long long totalTileCount = std::ceil( X_IMAGE_DIM / TILESIZE_XY ) * ( std::ceil( Y_IMAGE_DIM / TILESIZE_XY ) + 1 );
 
 	renderer() { bytes.resize( xdim * ydim * 4, 0 ); rng_seed(); }
-	void renderAndSaveTo( std::string filename ) {
+	void renderAndSaveTo( std::string filename, uint32_t seed ) {
 		// c.lookat( vec3( 0.0, 0.0, 2.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		// c.lookat( vec3( 5.0, 5.0, 5.0 ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
-		while ( s.contents.size() < 100 + NUM_PRIMITIVES * 8 ) {
+		// while ( s.contents.size() < 100 + NUM_PRIMITIVES * 8 ) {
 			s.clear();
-			s.populate();
-		}
+			s.populate( seed );
+			std::cout << "seed is: " << seed << std::endl;
+		// }
 
-		c.lookat( randomUnitVector( gen[ 0 ] ) * ( 2.2 + rng( gen[ 0 ] ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
+		wang viewGen = wang( seed );
+
+		c.lookat( randomUnitVector( viewGen ) * ( 2.2 + rng( viewGen ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
 		for ( int id = 0; id <= NUM_THREADS; id++ ){         // do work
 			threads[ id ] = ( id == NUM_THREADS ) ? std::thread(// reporter thread
@@ -596,10 +623,19 @@ int main ( int argc, char const *argv[] ) {
 
 
 	for ( size_t i = IMAGE_SEQUENCE_START_INDEX; i <= IMAGE_SEQUENCE_END_INDEX; i++ ) {
-		paletteToUse = i%3;
-		std::stringstream s; s << "outputs/out" << std::to_string( i ) << ".png";
+
+		std::random_device rng;
+		std::seed_seq seedSeq{ rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng() };
+		auto seeder = std::mt19937_64( seedSeq );
+		std::uniform_int_distribution< uint32_t > distribution( 0, 1 << 31 );
+		uint32_t seed = distribution( seeder );
+
+		// for consistency
+		paletteToUse = seed % 3;
+		std::stringstream s; s << "outputs/out" << std::to_string( i ) << "_" << seed << ".png";
+
 		renderer r;
-		r.renderAndSaveTo( s.str() );
+		r.renderAndSaveTo( s.str(), seed );
 	}
 
 	cout << "Total Render Time: " <<
