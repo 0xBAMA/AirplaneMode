@@ -100,36 +100,37 @@ vec3 random_in_unit_disk( wang& gen ) { // random in unit disk (xy plane)
 }
 
 
-
+vec3 bgColor;
 
 // iq style palettes
 int paletteToUse = 0;
 vec3 palette( baseType t ) {
-	vec3 a, b, c, d;
+	vec4 a, b, c, d;
 	switch ( paletteToUse ) {
 		case 0:
-			a = vec3( 0.50, 0.50, 0.50 );
-			b = vec3( 0.50, 0.50, 0.50 );
-			c = vec3( 1.00, 1.00, 1.00 );
-			d = vec3( 0.00, 0.10, 0.20 );
+			a = vec4( 0.50, 0.50, 0.50, 1.00 );
+			b = vec4( 0.50, 0.50, 0.50, 1.00 );
+			c = vec4( 1.00, 1.00, 1.00, 1.00 );
+			d = vec4( 0.00, 0.10, 0.20, 1.00 );
 			break;
 		case 1:
-			a = vec3( 0.50, 0.50, 0.50 );
-			b = vec3( 0.50, 0.50, 0.50 );
-			c = vec3( 1.00, 1.00, 0.50 );
-			d = vec3( 0.80, 0.90, 0.30 );
+			a = vec4( 0.50, 0.50, 0.50, 1.00 );
+			b = vec4( 0.50, 0.50, 0.50, 1.00 );
+			c = vec4( 1.00, 1.00, 0.50, 1.00 );
+			d = vec4( 0.80, 0.90, 0.30, 0.12 );
 			break;
 		case 2:
-			a = vec3( 0.50, 0.50, 0.50 );
-			b = vec3( 0.50, 0.50, 0.50 );
-			c = vec3( 1.00, 0.70, 0.40 );
-			d = vec3( 0.00, 0.15, 0.20 );
+			a = vec4( 0.50, 0.50, 0.50, 1.00 );
+			b = vec4( 0.50, 0.50, 0.50, 1.00 );
+			c = vec4( 1.00, 0.70, 0.40, 1.00 );
+			d = vec4( 0.00, 0.15, 0.20, 0.11 );
 			break;
 
 		default: break;
 	}
-	vec3 temp = ( c * t + d ) * 2.0 * pi;
-	return a + b * vec3( cos( temp.values[ 0 ] ), cos( temp.values[ 1 ] ), cos( temp.values[ 2 ] ) );
+	vec4 temp = ( c * t + d ) * 2.0 * pi;
+	vec4 temp2 = a + b * vec4( cos( temp.values[ 0 ] ), cos( temp.values[ 1 ] ), cos( temp.values[ 2 ] ), cos( temp.values[ 3 ] ) );
+	return vec3( temp2.x(), temp2.y(), temp2.z() );
 }
 
 
@@ -175,8 +176,8 @@ public:
 		baseType aspect_ratio = baseType( x ) / baseType( y );            // calculate pixel offset
 		lx *= aspect_ratio;
 		// scaling down the input reduces the effect of the spherical warping
-		lx *= 0.75;
-		ly *= 0.75;
+		lx *= FoV;
+		ly *= FoV;
 		// r.direction = normalize( lx * bx + ly * by + ( 1.0 / FoV ) * bz ); // construct from basis
 		vec2 polarCoords = vec2( atan2( ly, lx ) + 0.5, ( length( vec2( lx, ly ) ) + 0.5 ) * pi );
 		r.direction = normalize( vec3( cos( polarCoords.y() ) * cos( polarCoords.x() ), sin( polarCoords.y() ), cos( polarCoords.y() ) * sin( polarCoords.x() ) ) );
@@ -587,7 +588,10 @@ private:
 			old_ro = r.origin; 							// cache old hit location
 			hitrecord h = s.rayQuery( r );	// get a new hit location (scene query)
 
-			if ( h.dtransit == DMAX_TRAVEL ) break;
+			// if ( h.dtransit == DMAX_TRAVEL ) break;
+			// if ( h.dtransit == DMAX_TRAVEL ) return bgColor;
+			if ( h.dtransit == DMAX_TRAVEL ) return palette( dot( r.direction, vec3( 1.0 ) ) / 9.0 );
+
 			r.origin = r.origin + h.dtransit * r.direction + h.normal * HIT_EPSILON;
 			r.direction = normalize( ( 1.0 + HIT_EPSILON ) * h.normal + randomUnitVector( gen[ id ] ) ); // diffuse reflection
 
@@ -651,7 +655,6 @@ int main ( int argc, char const *argv[] ) {
 
 
 	for ( size_t i = IMAGE_SEQUENCE_START_INDEX; i <= IMAGE_SEQUENCE_END_INDEX; i++ ) {
-
 		std::random_device rng;
 		std::seed_seq seedSeq{ rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng() };
 		auto seeder = std::mt19937_64( seedSeq );
@@ -659,7 +662,13 @@ int main ( int argc, char const *argv[] ) {
 		uint32_t seed = distribution( seeder );
 
 		// for consistency
-		paletteToUse = seed % 3;
+		// paletteToUse = seed % 3;
+		paletteToUse = 0;
+
+		wang bgGenerator( seed );
+		// bgColor = vec3( bgGenerator.getNum(), bgGenerator.getNum(), bgGenerator.getNum() );
+		bgColor = palette( bgGenerator.getNum() * 5.0 ) * bgGenerator.getNum() * bgGenerator.getNum();
+
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << "_" << seed << ".png";
 
 		renderer r;
