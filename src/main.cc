@@ -11,7 +11,7 @@
 #include <thread>				// threads
 #include <memory>				// shared_ptr
 
-using std::cerr, std::cin, std::cout, std::endl, std::flush;
+using std::cerr, std::cin, std::cout, std::endl, std::flush, std::sin, std::cos;
 using std::chrono::high_resolution_clock, std::chrono::duration_cast, std::chrono::milliseconds;
 using std::make_shared;
 
@@ -153,7 +153,33 @@ public:
 		baseType lx = ( p.values[ 0 ] - baseType( x / 2.0 ) ) / baseType( x / 2.0 );
 		baseType ly = ( p.values[ 1 ] - baseType( y / 2.0 ) ) / baseType( y / 2.0 );
 		baseType aspect_ratio = baseType( x ) / baseType( y );            // calculate pixel offset
-		r.direction = normalize( aspect_ratio * lx * bx + ly * by + ( 1.0 / FoV ) * bz ); // construct from basis
+		lx *= aspect_ratio;
+		r.direction = normalize( lx * bx + ly * by + ( 1.0 / FoV ) * bz ); // construct from basis
+		return r;
+	}
+	// vec3 getRdSpherical ( vec2 uv ){
+	// 	// polar coords
+	// 	uv = vec2(atan(uv.y,uv.x),length(uv));
+	// 	uv += 0.5;
+	// 	uv.y *= PI;
+	// 	// parametrized sphere
+	// 	return normalize(vec3(cos(uv.y)*cos(uv.x),sin(uv.y),cos(uv.y)*sin(uv.x)));
+	// }
+
+	ray sampleSphericalCamera( const vec2 p ) const {
+		ray r;
+		r.origin = position;
+		// remap [0, dimension] indexing to [-dimension/2., dimension/2.]
+		baseType lx = ( p.values[ 0 ] - baseType( x / 2.0 ) ) / baseType( x / 2.0 );
+		baseType ly = ( p.values[ 1 ] - baseType( y / 2.0 ) ) / baseType( y / 2.0 );
+		baseType aspect_ratio = baseType( x ) / baseType( y );            // calculate pixel offset
+		lx *= aspect_ratio;
+		// scaling down the input reduces the effect of the spherical warping
+		lx *= 0.75;
+		ly *= 0.75;
+		// r.direction = normalize( lx * bx + ly * by + ( 1.0 / FoV ) * bz ); // construct from basis
+		vec2 polarCoords = vec2( atan2( ly, lx ) + 0.5, ( length( vec2( lx, ly ) ) + 0.5 ) * pi );
+		r.direction = normalize( vec3( cos( polarCoords.y() ) * cos( polarCoords.x() ), sin( polarCoords.y() ), cos( polarCoords.y() ) * sin( polarCoords.x() ) ) );
 		return r;
 	}
 private:
@@ -446,7 +472,8 @@ public:
 
 		wang viewGen = wang( seed );
 
-		c.lookat( randomUnitVector( viewGen ) * ( 2.2 + rng( viewGen ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
+		c.lookat( randomUnitVector( viewGen ) * ( 0.3 + rng( viewGen ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
+
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
 		for ( int id = 0; id <= NUM_THREADS; id++ ){         // do work
 			threads[ id ] = ( id == NUM_THREADS ) ? std::thread(// reporter thread
@@ -554,7 +581,8 @@ private:
 		vec3 old_ro;										// old_ro holds previous hit location, unitialized
 
 		// get initial ray origin + ray direction from camera
-		ray r = c.sample( vec2( x + rng( gen[ id ] ), y + rng( gen[ id ] ) ) );
+		// ray r = c.sample( vec2( x + rng( gen[ id ] ), y + rng( gen[ id ] ) ) );
+		ray r = c.sampleSphericalCamera( vec2( x + rng( gen[ id ] ), y + rng( gen[ id ] ) ) );
 		for ( int bounce = 0; bounce < MAX_BOUNCES; bounce++ ) {
 			old_ro = r.origin; 							// cache old hit location
 			hitrecord h = s.rayQuery( r );	// get a new hit location (scene query)
