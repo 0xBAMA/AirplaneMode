@@ -6,7 +6,7 @@
 #include <random>				// prng
 #include <string>				// std::string
 #include <sstream>			// std::stringstream
-#include <algorithm>		// clamp
+#include <algorithm>		// clamp, shuffle
 #include <atomic>				// atomic_llong
 #include <thread>				// threads
 #include <memory>				// shared_ptr
@@ -181,6 +181,7 @@ public:
 		// r.direction = normalize( lx * bx + ly * by + ( 1.0 / FoV ) * bz ); // construct from basis
 		vec2 polarCoords = vec2( atan2( ly, lx ) + 0.5, ( length( vec2( lx, ly ) ) + 0.5 ) * pi );
 		r.direction = normalize( vec3( cos( polarCoords.y() ) * cos( polarCoords.x() ), sin( polarCoords.y() ), cos( polarCoords.y() ) * sin( polarCoords.x() ) ) );
+		r.direction = r.direction.x() * bx + r.direction.y() * by + r.direction.z() * bz;
 		return r;
 	}
 private:
@@ -195,6 +196,10 @@ class scene{ // scene as primitive list + material list container
 public:
 	scene() { }
 	void clear() { contents.clear(); }
+	void shuffle() {
+		auto rngo = std::default_random_engine{};
+		std::shuffle( std::begin( contents ), std::end( contents ), rngo );
+	}
 
 	void recursiveSplit( vec3 min, vec3 max /*, int previousAxisPick */ ) {
 		if( length( min - max ) < 0.1 ||
@@ -355,7 +360,6 @@ public:
 		wang genLocal( seed );
 		gen.seed = genLocal.seed;
 
-
 		// for (int i = 0; i < 7; i++)
 			// contents.push_back(make_shared<sphere>(0.8*randomVector(gen), 0.03*rng(gen), 0));
 		// for ( int i = 0; i < NUM_PRIMITIVES; i++ ){
@@ -372,22 +376,16 @@ public:
 		// contents.push_back( make_shared< sphere >( vec3( 0.0, 0.0, 1.5 ), 0.20, 2 ) );
 
 
-		vec3 v1, v2, v3, v4;
-		v1 = vec3( 0, 0, 1 );
-		v2 = vec3( sqrt( 8.0 / 9.0 ), 0, -1.0 / 3.0 );
-		v3 = vec3( -sqrt( 2.0 / 9.0 ), sqrt( 2.0 / 3.0 ), -1.0 / 3.0 );
-		v4 = vec3( -sqrt( 2.0 / 9.0 ), -sqrt( 2.0 / 3.0 ), -1.0 / 3.0 );
+		// const vec3 rotationAxis = randomUnitVector( gen );
+		// const baseType tetScalar = 1.5;
+		// const baseType amount = rng( gen );
+		//
+		// const vec3 v1 = tetScalar * erot( vec3( 0, 0, 1 ), rotationAxis, amount );
+		// const vec3 v2 = tetScalar * erot( vec3( sqrt( 8.0 / 9.0 ), 0, -1.0 / 3.0 ), rotationAxis, amount );
+		// const vec3 v3 = tetScalar * erot( vec3( -sqrt( 2.0 / 9.0 ), sqrt( 2.0 / 3.0 ), -1.0 / 3.0 ), rotationAxis, amount );
+		// const vec3 v4 = tetScalar * erot( vec3( -sqrt( 2.0 / 9.0 ), -sqrt( 2.0 / 3.0 ), -1.0 / 3.0 ), rotationAxis, amount );
 
-
-		vec3 rotationAxis = randomUnitVector( gen );
-		baseType amount = rng( gen );
-		baseType tetScalar = 1.5;
-
-
-		v1 = tetScalar * erot( v1, rotationAxis, amount );
-		v2 = tetScalar * erot( v2, rotationAxis, amount );
-		v3 = tetScalar * erot( v3, rotationAxis, amount );
-		v4 = tetScalar * erot( v4, rotationAxis, amount );
+		contents.push_back( make_shared< sphere >( vec3( 0.0 ), 0.3, 2 ) );
 
 		for( int i = 0; i < NUM_PRIMITIVES; i++ ) {
 
@@ -395,15 +393,13 @@ public:
 			contents.push_back( make_shared< sphere >( randomUnitVector( gen ) * 1.4, 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 			contents.push_back( make_shared< sphere >( randomUnitVector( gen ) * 1.4, 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
-			// segments
-			contents.push_back( make_shared< sphere >( v1 + baseType( i ) * ( ( v2 - v1 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
-			contents.push_back( make_shared< sphere >( v2 + baseType( i ) * ( ( v3 - v2 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
-			contents.push_back( make_shared< sphere >( v3 + baseType( i ) * ( ( v1 - v3 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
-			contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v1 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
-			contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v2 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
-			contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v3 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
-
-
+			// // segments
+			// contents.push_back( make_shared< sphere >( v1 + baseType( i ) * ( ( v2 - v1 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			// contents.push_back( make_shared< sphere >( v2 + baseType( i ) * ( ( v3 - v2 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			// contents.push_back( make_shared< sphere >( v3 + baseType( i ) * ( ( v1 - v3 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			// contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v1 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			// contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v2 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
+			// contents.push_back( make_shared< sphere >( v4 + baseType( i ) * ( ( v3 - v4 ) / NUM_PRIMITIVES ), 0.1 * rng( gen ), rng( gen ) < 0.1618 ? 3 : 2 ) );
 
 			// int select = int( floor( rng( gen ) * 3.0 ) );
 			// vec3 v0 = randomVector( gen );
@@ -422,8 +418,9 @@ public:
 		// recursiveSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ) );
 
 		// recursiveWangSplit( vec3( -1.0 * x, -1.0 * y, -1.0 * z ), vec3( x, y, z ), int( floor( rng( gen ) * 3.0 ) ), myWang, 0 );
-		recursiveMultiSplit( vec3( -1.0, -0.25, -1.5 ), vec3( 1.0, 0.25, 1.5 ), 1 );
-
+		recursiveMultiSplit( vec3( -1.0, -0.25, -1.5 ), vec3( 1.0, 0.25, 1.5 ), 0 );
+		// recursiveMultiSplit( vec3( -0.25, -1.0, -1.5 ), vec3( 0.25, 1.0, 1.5 ), 1 );
+		// recursiveMultiSplit( vec3( -1.5, -0.25, -1.0 ), vec3( 1.5, 0.25, 1.0 ), 2 );
 
 		// recursiveWangMultiSplit( vec3( -1.0, -0.25, -0.5 ), vec3( 1.0, 0.25, 0.5 ), 1, 69420 * rng( gen ) );
 		// recursiveWangMultiSplit( vec3( -1.0 ), vec3( 1.0 ), 1, 69420 * rng( gen ) );
@@ -431,8 +428,6 @@ public:
 
 		//recursive( myWang, 0 );
 		//cout << endl;
-
-
 	}
 	hitrecord rayQuery( ray r ) const {
 		hitrecord h; // iterate through primitives and check for nearest intersection
@@ -468,12 +463,14 @@ public:
 		// while ( s.contents.size() < 100 + NUM_PRIMITIVES * 8 ) {
 			s.clear();
 			s.populate( seed );
+			s.shuffle();
 			std::cout << "seed is: " << seed << std::endl;
 		// }
 
 		wang viewGen = wang( seed );
 
-		c.lookat( randomUnitVector( viewGen ) * ( 0.3 + rng( viewGen ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
+		// c.lookat( randomUnitVector( viewGen ) * ( 0.3 + rng( viewGen ) ), vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
+		c.lookat( randomUnitVector( viewGen ) * 0.45, vec3( 0.0 ), vec3( 0.0, 1.0, 0.0 ) );
 
 		std::thread threads[ NUM_THREADS + 1 ];                 // create thread pool
 		for ( int id = 0; id <= NUM_THREADS; id++ ){         // do work
@@ -483,11 +480,11 @@ public:
 					while ( true ) { // report timing
 						// show status - break on 100% completion
 						cout << "\r\033[K";
-						const baseType frac = baseType( tileFinishCounter ) / baseType( totalTileCount );
-
 						cout << "["; //  [=====....................] where equals shows progress
-						for( int i = 0; i <= PROGRESS_INDICATOR_STOPS * frac; i++ ) cout << "=";
-						for( int i = 0; i < PROGRESS_INDICATOR_STOPS * ( 1 - frac); i++ ) cout << ".";
+						const baseType frac = baseType( tileFinishCounter ) / baseType( totalTileCount );
+						int numFill = std::floor( PROGRESS_INDICATOR_STOPS * frac ) - 1;
+						for( int i = 0; i <= numFill; i++ ) cout << "=";
+						for( int i = 0; i < PROGRESS_INDICATOR_STOPS - numFill; i++ ) cout << ".";
 						cout << "]" << std::flush;
 
 						// const int tile_width_char = std::ceil(std::log10(totalTileCount));
@@ -580,6 +577,7 @@ private:
 		vec3 throughput	= vec3( 1.0 );	// by the albedo of the material on each bounce
 		vec3 current		= vec3( 0.0 );	// init to zero - initially no light present
 		vec3 old_ro;										// old_ro holds previous hit location, unitialized
+		static baseType paletteOffset = rng( gen[ 0 ] ) * 5.0;
 
 		// get initial ray origin + ray direction from camera
 		// ray r = c.sample( vec2( x + rng( gen[ id ] ), y + rng( gen[ id ] ) ) );
@@ -590,10 +588,14 @@ private:
 
 			// if ( h.dtransit == DMAX_TRAVEL ) break;
 			// if ( h.dtransit == DMAX_TRAVEL ) return bgColor;
-			if ( h.dtransit == DMAX_TRAVEL ) return palette( dot( r.direction, vec3( 1.0 ) ) / 9.0 );
+			// if ( h.dtransit == DMAX_TRAVEL ) return palette( ( dot( r.direction, vec3( 1.0 ) ) / 3.0 ) + paletteOffset );
+			// if ( h.dtransit == DMAX_TRAVEL ) return ( ( r.direction + vec3( 1.0 ) ) * 0.5 ) * bgColor;
+			// if ( h.dtransit == DMAX_TRAVEL ) return bgColor * abs( dot( r.direction, vec3( 0.0, 1.0, 0.0 ) ) );
+			if ( h.dtransit == DMAX_TRAVEL ) return bgColor * abs( dot( r.direction, vec3( 0.0, 1.0, 0.0 ) ) ) * sin( 5.0 * dot( r.direction, vec3( 1.0, 0.0, 0.0 ) ) ); // * cos( dot( r.direction, vec3( 0.0, 0.0, 1.0 ) ) * 9.0 );
 
 			r.origin = r.origin + h.dtransit * r.direction + h.normal * HIT_EPSILON;
 			r.direction = normalize( ( 1.0 + HIT_EPSILON ) * h.normal + randomUnitVector( gen[ id ] ) ); // diffuse reflection
+
 
 			// the form is:
 				// current    += throughput*current_emission // emission term
@@ -610,15 +612,14 @@ private:
 			// } else if ( h.materialID == 2 ) {
 
 
-			static baseType paletteOffset = rng( gen[ 0 ] ) * 5.0;
 			if ( h.materialID == 2 ) {
 				r.direction = reflect( r.origin - old_ro, h.normal );
 				throughput *= vec3( 0.89 );
 			} else if ( h.materialID == 1 ) {
 				// current += throughput * abs( h.normal );
-				current += throughput * palette( ( 2.2 / NUM_PRIMITIVES ) * h.primitiveID * PALETTE_SCALAR + paletteOffset );
+				current += throughput * palette( ( 5.0 / NUM_PRIMITIVES ) * h.primitiveID * PALETTE_SCALAR + paletteOffset );
 			} else if ( h.materialID == 3 ) {
-				throughput *= vec3( 0.65 );
+				throughput *= vec3( 0.65 ) * palette( ( 5.0 / NUM_PRIMITIVES ) * h.primitiveID * PALETTE_SCALAR + paletteOffset );
 			}
 
 
@@ -667,7 +668,7 @@ int main ( int argc, char const *argv[] ) {
 
 		wang bgGenerator( seed );
 		// bgColor = vec3( bgGenerator.getNum(), bgGenerator.getNum(), bgGenerator.getNum() );
-		bgColor = palette( bgGenerator.getNum() * 5.0 ) * bgGenerator.getNum() * bgGenerator.getNum();
+		bgColor = palette( bgGenerator.getNum() * 5.0 ) * bgGenerator.getNum();
 
 		std::stringstream s; s << "outputs/out" << std::to_string( i ) << "_" << seed << ".png";
 
